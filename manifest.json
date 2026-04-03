@@ -3,8 +3,7 @@
   "name": "Reversewind",
   "version": "0.1.0",
   "description": "Copy any web element as HTML + Tailwind CSS from the right-click menu",
-  "permissions": ["contextMenus", "activeTab", "scripting", "clipboardWrite"],
-  "host_permissions": ["<all_urls>"],
+  "permissions": ["contextMenus", "activeTab", "clipboardWrite"],
   "background": {
     "service_worker": "service-worker.js"
   },
