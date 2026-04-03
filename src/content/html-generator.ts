@@ -1,4 +1,4 @@
-import type { OutputNode } from '../shared/types';
+import type { OutputNode, OutputChild } from '../shared/types';
 
 /** セルフクローズタグ */
 const VOID_ELEMENTS = new Set([
@@ -17,6 +17,16 @@ const VOID_ELEMENTS = new Set([
   'track',
   'wbr',
 ]);
+
+/**
+ * OutputChildからHTML文字列を生成する
+ */
+function generateChild(child: OutputChild, indent: number): string {
+  if (child.type === 'text') {
+    return `${'  '.repeat(indent)}${escapeHtml(child.content)}`;
+  }
+  return generateHtml(child, indent);
+}
 
 /**
  * OutputNodeからインデント付きHTML文字列を生成する
@@ -53,31 +63,22 @@ export function generateHtml(node: OutputNode, indent: number = 0): string {
     return `${pad}<${tag}${attrs} />`;
   }
 
-  // 子要素もテキストもない
-  if (node.children.length === 0 && !node.textContent) {
+  // 子なし
+  if (node.children.length === 0) {
     return `${pad}<${tag}${attrs}></${tag}>`;
   }
 
-  // テキストのみ
-  if (node.children.length === 0 && node.textContent) {
-    return `${pad}<${tag}${attrs}>${escapeHtml(node.textContent)}</${tag}>`;
+  // テキストのみの子（1つのテキストノードだけ）
+  if (node.children.length === 1 && node.children[0].type === 'text') {
+    return `${pad}<${tag}${attrs}>${escapeHtml(node.children[0].content)}</${tag}>`;
   }
 
-  // 子要素あり
+  // 複数の子 — 順序を保持して出力
   const childrenHtml = node.children
-    .map((child) => generateHtml(child, indent + 1))
+    .map((child) => generateChild(child, indent + 1))
     .join('\n');
 
-  const lines = [`${pad}<${tag}${attrs}>`];
-
-  if (node.textContent) {
-    lines.push(`${'  '.repeat(indent + 1)}${escapeHtml(node.textContent)}`);
-  }
-
-  lines.push(childrenHtml);
-  lines.push(`${pad}</${tag}>`);
-
-  return lines.join('\n');
+  return `${pad}<${tag}${attrs}>\n${childrenHtml}\n${pad}</${tag}>`;
 }
 
 function escapeHtml(str: string): string {

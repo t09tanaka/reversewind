@@ -26,6 +26,39 @@ const FALLBACK_PROPERTIES = [
 ];
 
 /**
+ * フォールバックプロパティのデフォルト値
+ * これらはブラウザデフォルトなので出力しない
+ */
+const FALLBACK_DEFAULTS: Record<string, Set<string>> = {
+  'object-fit': new Set(['fill']),
+  'object-position': new Set(['50% 50%']),
+  cursor: new Set(['default', 'auto']),
+  'user-select': new Set(['auto']),
+  'pointer-events': new Set(['auto']),
+  resize: new Set(['none']),
+  appearance: new Set(['none', 'auto', 'button', 'menulist-button']),
+  outline: new Set(['none']),
+  'outline-offset': new Set(['0px']),
+  'scroll-behavior': new Set(['auto']),
+  isolation: new Set(['auto']),
+  'will-change': new Set(['auto']),
+  contain: new Set(['none']),
+  'content-visibility': new Set(['visible']),
+};
+
+/**
+ * outline値がデフォルト（none 0px）かどうかを判定
+ */
+function isDefaultOutline(value: string): boolean {
+  return (
+    value === 'none' ||
+    value.includes(' none ') ||
+    value.endsWith(' none 0px') ||
+    value.endsWith(' 0px')
+  );
+}
+
+/**
  * 要素のcomputedStyleから正規化スタイルを抽出する
  */
 export function extractStyles(element: Element): NormalizedStyles {
@@ -34,9 +67,19 @@ export function extractStyles(element: Element): NormalizedStyles {
   const fallback: Record<string, string> = {};
   for (const prop of FALLBACK_PROPERTIES) {
     const value = cs.getPropertyValue(prop);
-    if (value && value !== 'none' && value !== 'auto' && value !== 'normal') {
-      fallback[prop] = value;
+    if (!value || value === 'none' || value === 'auto' || value === 'normal') {
+      continue;
     }
+
+    // デフォルト値チェック
+    const defaults = FALLBACK_DEFAULTS[prop];
+    if (defaults && defaults.has(value)) continue;
+
+    // outline特殊処理
+    if (prop === 'outline' && isDefaultOutline(value)) continue;
+    if (prop === 'outline-offset' && value === '0px') continue;
+
+    fallback[prop] = value;
   }
 
   return {

@@ -1,7 +1,11 @@
+import { SVG_ELEMENTS } from '../shared/constants';
 import type {
   ExtractedNode,
+  ExtractedChild,
   NormalizedStyles,
   OutputNode,
+  OutputChild,
+  SizeInfo,
 } from '../shared/types';
 
 // ─── Spacing scale (px → Tailwind) ───
@@ -117,8 +121,6 @@ const JUSTIFY_MAP: Record<string, string> = {
   'space-between': 'justify-between',
   'space-around': 'justify-around',
   'space-evenly': 'justify-evenly',
-  normal: 'justify-normal',
-  stretch: 'justify-stretch',
 };
 
 // ─── Align Items ───
@@ -128,7 +130,6 @@ const ALIGN_ITEMS_MAP: Record<string, string> = {
   center: 'items-center',
   baseline: 'items-baseline',
   stretch: 'items-stretch',
-  normal: 'items-stretch',
 };
 
 // ─── Text Align ───
@@ -137,8 +138,6 @@ const TEXT_ALIGN_MAP: Record<string, string> = {
   center: 'text-center',
   right: 'text-right',
   justify: 'text-justify',
-  start: 'text-start',
-  end: 'text-end',
 };
 
 // ─── Text Transform ───
@@ -146,8 +145,95 @@ const TEXT_TRANSFORM_MAP: Record<string, string> = {
   uppercase: 'uppercase',
   lowercase: 'lowercase',
   capitalize: 'capitalize',
-  none: 'normal-case',
 };
+
+// ─── タグごとのデフォルト display 値 ───
+const TAG_DEFAULT_DISPLAY: Record<string, string> = {
+  div: 'block',
+  section: 'block',
+  article: 'block',
+  main: 'block',
+  header: 'block',
+  footer: 'block',
+  nav: 'block',
+  aside: 'block',
+  p: 'block',
+  h1: 'block',
+  h2: 'block',
+  h3: 'block',
+  h4: 'block',
+  h5: 'block',
+  h6: 'block',
+  ul: 'block',
+  ol: 'block',
+  li: 'list-item',
+  form: 'block',
+  fieldset: 'block',
+  hr: 'block',
+  pre: 'block',
+  blockquote: 'block',
+  address: 'block',
+  figure: 'block',
+  figcaption: 'block',
+  details: 'block',
+  summary: 'block',
+  span: 'inline',
+  a: 'inline',
+  strong: 'inline',
+  em: 'inline',
+  b: 'inline',
+  i: 'inline',
+  u: 'inline',
+  s: 'inline',
+  small: 'inline',
+  sub: 'inline',
+  sup: 'inline',
+  code: 'inline',
+  kbd: 'inline',
+  var: 'inline',
+  abbr: 'inline',
+  cite: 'inline',
+  mark: 'inline',
+  time: 'inline',
+  label: 'inline',
+  br: 'inline',
+  img: 'inline',
+  input: 'inline-block',
+  button: 'inline-block',
+  select: 'inline-block',
+  textarea: 'inline-block',
+  table: 'table',
+  thead: 'table-header-group',
+  tbody: 'table-row-group',
+  tfoot: 'table-footer-group',
+  tr: 'table-row',
+  td: 'table-cell',
+  th: 'table-cell',
+  svg: 'inline',
+  path: 'inline',
+  circle: 'inline',
+  rect: 'inline',
+  line: 'inline',
+  polygon: 'inline',
+  polyline: 'inline',
+  g: 'inline',
+};
+
+/**
+ * CSS継承プロパティ一覧
+ * 親と同じ値なら子では出力しない
+ */
+const INHERITED_PROPERTIES: (keyof NormalizedStyles)[] = [
+  'color',
+  'fontSize',
+  'fontWeight',
+  'fontFamily',
+  'lineHeight',
+  'letterSpacing',
+  'textAlign',
+  'textTransform',
+  'whiteSpace',
+];
 
 // ─── Helpers ───
 
@@ -173,7 +259,6 @@ function spacingClass(px: number): string {
  * rgb/rgba文字列をhexに変換
  */
 export function rgbToHex(color: string): string {
-  // transparent
   if (
     color === 'transparent' ||
     color === 'rgba(0, 0, 0, 0)' ||
@@ -202,32 +287,48 @@ export function rgbToHex(color: string): string {
 /**
  * NormalizedStylesからTailwind classリストとfallback styleを生成する
  */
-export function mapStylesToTailwind(styles: NormalizedStyles): {
+export function mapStylesToTailwind(
+  styles: NormalizedStyles,
+  tagName?: string,
+  parentStyles?: NormalizedStyles,
+  sizeInfo?: SizeInfo,
+): {
   classes: string[];
   inlineStyles: Record<string, string>;
 } {
   const classes: string[] = [];
   const inlineStyles: Record<string, string> = {};
 
-  // Display
-  if (styles.display && styles.display !== 'block') {
+  // SVG内部要素はTailwind変換をスキップ
+  if (tagName && SVG_ELEMENTS.has(tagName)) {
+    return { classes, inlineStyles };
+  }
+
+  const defaultDisplay = tagName
+    ? (TAG_DEFAULT_DISPLAY[tagName] ?? 'inline')
+    : 'block';
+
+  // Display — デフォルト値なら省略
+  if (styles.display && styles.display !== defaultDisplay) {
     const cls = DISPLAY_MAP[styles.display];
     if (cls) classes.push(cls);
   }
 
-  // Position
+  // Position — static はデフォルトなので省略
   if (styles.position && styles.position !== 'static') {
     const cls = POSITION_MAP[styles.position];
     if (cls) classes.push(cls);
   }
 
-  // Position offsets (top/right/bottom/left)
-  mapPositionOffset(styles.top, 'top', classes);
-  mapPositionOffset(styles.right, 'right', classes);
-  mapPositionOffset(styles.bottom, 'bottom', classes);
-  mapPositionOffset(styles.left, 'left', classes);
+  // Position offsets (top/right/bottom/left) — positionがstatic以外のみ
+  if (styles.position && styles.position !== 'static') {
+    mapPositionOffset(styles.top, 'top', classes);
+    mapPositionOffset(styles.right, 'right', classes);
+    mapPositionOffset(styles.bottom, 'bottom', classes);
+    mapPositionOffset(styles.left, 'left', classes);
+  }
 
-  // Z-index
+  // Z-index — autoはデフォルト
   if (styles.zIndex && styles.zIndex !== 'auto') {
     const z = parseInt(styles.zIndex);
     if (!isNaN(z)) {
@@ -240,22 +341,26 @@ export function mapStylesToTailwind(styles: NormalizedStyles): {
     }
   }
 
-  // Overflow
+  // Overflow — visible はデフォルト
   if (styles.overflow && styles.overflow !== 'visible') {
     if (styles.overflow === 'hidden') classes.push('overflow-hidden');
     else if (styles.overflow === 'auto') classes.push('overflow-auto');
     else if (styles.overflow === 'scroll') classes.push('overflow-scroll');
   }
 
-  // Width
-  mapSize(styles.width, 'w', classes);
-  mapSize(styles.minWidth, 'min-w', classes);
-  mapSize(styles.maxWidth, 'max-w', classes);
+  // Width — sizeInfo.widthAuthored が true の場合のみ出力
+  if (!sizeInfo || sizeInfo.widthAuthored) {
+    mapSize(styles.width, 'w', classes);
+    mapSize(styles.minWidth, 'min-w', classes);
+    mapSize(styles.maxWidth, 'max-w', classes);
+  }
 
-  // Height
-  mapSize(styles.height, 'h', classes);
-  mapSize(styles.minHeight, 'min-h', classes);
-  mapSize(styles.maxHeight, 'max-h', classes);
+  // Height — sizeInfo.heightAuthored が true の場合のみ出力
+  if (!sizeInfo || sizeInfo.heightAuthored) {
+    mapSize(styles.height, 'h', classes);
+    mapSize(styles.minHeight, 'min-h', classes);
+    mapSize(styles.maxHeight, 'max-h', classes);
+  }
 
   // Margin
   mapSpacing(styles.margin, 'm', classes);
@@ -263,10 +368,28 @@ export function mapStylesToTailwind(styles: NormalizedStyles): {
   // Padding
   mapSpacing(styles.padding, 'p', classes);
 
-  // Gap
-  mapGap(styles.gap, 'gap', classes);
-  mapGap(styles.rowGap, 'gap-y', classes);
-  mapGap(styles.columnGap, 'gap-x', classes);
+  // Gap — 正規化: gap設定済みなら row-gap/column-gap は省略
+  const gapPx = parsePx(styles.gap);
+  const rowGapPx = parsePx(styles.rowGap);
+  const colGapPx = parsePx(styles.columnGap);
+
+  if (gapPx !== null && gapPx > 0) {
+    // row-gap/column-gapが同じ値ならgapだけ出力
+    if (rowGapPx === gapPx && colGapPx === gapPx) {
+      mapGap(styles.gap, 'gap', classes);
+    } else {
+      // 異なる場合は個別出力
+      mapGap(styles.gap, 'gap', classes);
+    }
+  } else {
+    // gapがない場合のみ個別gap出力
+    if (rowGapPx !== null && rowGapPx > 0) {
+      mapGap(styles.rowGap, 'gap-y', classes);
+    }
+    if (colGapPx !== null && colGapPx > 0) {
+      mapGap(styles.columnGap, 'gap-x', classes);
+    }
+  }
 
   // Flex
   if (styles.display === 'flex' || styles.display === 'inline-flex') {
@@ -275,14 +398,25 @@ export function mapStylesToTailwind(styles: NormalizedStyles): {
       classes.push('flex-col-reverse');
     if (styles.flexDirection === 'row-reverse')
       classes.push('flex-row-reverse');
+    // row はデフォルトなので省略
     if (styles.flexWrap === 'wrap') classes.push('flex-wrap');
     if (styles.flexWrap === 'wrap-reverse') classes.push('flex-wrap-reverse');
 
-    if (styles.justifyContent) {
+    // justify-content: normal/stretch/flex-start はデフォルト
+    if (
+      styles.justifyContent &&
+      styles.justifyContent !== 'normal' &&
+      styles.justifyContent !== 'flex-start'
+    ) {
       const cls = JUSTIFY_MAP[styles.justifyContent];
       if (cls) classes.push(cls);
     }
-    if (styles.alignItems) {
+    // align-items: normal/stretch はデフォルト
+    if (
+      styles.alignItems &&
+      styles.alignItems !== 'normal' &&
+      styles.alignItems !== 'stretch'
+    ) {
       const cls = ALIGN_ITEMS_MAP[styles.alignItems];
       if (cls) classes.push(cls);
     }
@@ -294,13 +428,21 @@ export function mapStylesToTailwind(styles: NormalizedStyles): {
     mapGridTemplate(styles.gridTemplateRows, 'grid-rows', classes);
   }
 
-  // Background color
-  mapColor(styles.backgroundColor, 'bg', classes);
+  // Background color — transparent はデフォルト
+  if (
+    styles.backgroundColor &&
+    styles.backgroundColor !== 'transparent' &&
+    styles.backgroundColor !== 'rgba(0, 0, 0, 0)'
+  ) {
+    mapColor(styles.backgroundColor, 'bg', classes);
+  }
 
-  // Text color
-  mapColor(styles.color, 'text', classes);
+  // Text color — 継承チェック
+  if (styles.color && !isInherited('color', styles, parentStyles)) {
+    mapColor(styles.color, 'text', classes);
+  }
 
-  // Opacity
+  // Opacity — 1 はデフォルト
   if (styles.opacity && styles.opacity !== '1') {
     const op = parseFloat(styles.opacity);
     const percent = Math.round(op * 100);
@@ -315,14 +457,17 @@ export function mapStylesToTailwind(styles: NormalizedStyles): {
     }
   }
 
-  // Border radius
+  // Border radius — 0 はデフォルト
   if (styles.borderRadius) {
-    if (styles.borderRadius === '9999px' || styles.borderRadius === '50%') {
+    if (styles.borderRadius === '50%') {
       classes.push('rounded-full');
     } else {
       const px = parsePx(styles.borderRadius);
       if (px !== null && px > 0) {
-        if (px in RADIUS_MAP) {
+        // 大きな値（999px以上）は rounded-full の意図
+        if (px >= 999) {
+          classes.push('rounded-full');
+        } else if (px in RADIUS_MAP) {
           classes.push(RADIUS_MAP[px]);
         } else {
           classes.push(`rounded-[${px}px]`);
@@ -337,8 +482,8 @@ export function mapStylesToTailwind(styles: NormalizedStyles): {
   // Box shadow
   mapBoxShadow(styles.boxShadow, classes, inlineStyles);
 
-  // Font size
-  if (styles.fontSize) {
+  // Font size — 継承チェック
+  if (styles.fontSize && !isInherited('fontSize', styles, parentStyles)) {
     const px = parsePx(styles.fontSize);
     if (px !== null) {
       if (px in FONT_SIZE_MAP) {
@@ -349,41 +494,61 @@ export function mapStylesToTailwind(styles: NormalizedStyles): {
     }
   }
 
-  // Font weight
-  if (styles.fontWeight) {
+  // Font weight — 継承チェック。400はデフォルト
+  if (
+    styles.fontWeight &&
+    styles.fontWeight !== '400' &&
+    !isInherited('fontWeight', styles, parentStyles)
+  ) {
     const cls = FONT_WEIGHT_MAP[styles.fontWeight];
     if (cls) classes.push(cls);
   }
 
-  // Line height
-  if (styles.lineHeight && styles.lineHeight !== 'normal') {
+  // Line height — 継承チェック
+  if (
+    styles.lineHeight &&
+    styles.lineHeight !== 'normal' &&
+    !isInherited('lineHeight', styles, parentStyles)
+  ) {
     const px = parsePx(styles.lineHeight);
     if (px !== null) {
       classes.push(`leading-[${px}px]`);
     }
   }
 
-  // Letter spacing
-  if (styles.letterSpacing && styles.letterSpacing !== 'normal') {
+  // Letter spacing — 継承チェック
+  if (
+    styles.letterSpacing &&
+    styles.letterSpacing !== 'normal' &&
+    !isInherited('letterSpacing', styles, parentStyles)
+  ) {
     const px = parsePx(styles.letterSpacing);
     if (px !== null && px !== 0) {
       classes.push(`tracking-[${px}px]`);
     }
   }
 
-  // Text align
-  if (styles.textAlign) {
+  // Text align — 継承チェック。startはデフォルト
+  if (
+    styles.textAlign &&
+    styles.textAlign !== 'start' &&
+    !isInherited('textAlign', styles, parentStyles)
+  ) {
     const cls = TEXT_ALIGN_MAP[styles.textAlign];
     if (cls) classes.push(cls);
   }
 
-  // Text transform
-  if (styles.textTransform && styles.textTransform !== 'none') {
+  // Text transform — 継承チェック。noneはデフォルト
+  if (
+    styles.textTransform &&
+    styles.textTransform !== 'none' &&
+    !isInherited('textTransform', styles, parentStyles)
+  ) {
     const cls = TEXT_TRANSFORM_MAP[styles.textTransform];
     if (cls) classes.push(cls);
   }
 
-  // Text decoration
+  // Text decoration — noneはデフォルト
   if (styles.textDecoration) {
     if (styles.textDecoration.includes('underline')) classes.push('underline');
     else if (styles.textDecoration.includes('line-through'))
@@ -392,8 +557,12 @@ export function mapStylesToTailwind(styles: NormalizedStyles): {
       classes.push('overline');
   }
 
-  // White space
-  if (styles.whiteSpace && styles.whiteSpace !== 'normal') {
+  // White space — 継承チェック。normalはデフォルト
+  if (
+    styles.whiteSpace &&
+    styles.whiteSpace !== 'normal' &&
+    !isInherited('whiteSpace', styles, parentStyles)
+  ) {
     if (styles.whiteSpace === 'nowrap') classes.push('whitespace-nowrap');
     else if (styles.whiteSpace === 'pre') classes.push('whitespace-pre');
     else if (styles.whiteSpace === 'pre-wrap')
@@ -412,6 +581,20 @@ export function mapStylesToTailwind(styles: NormalizedStyles): {
   }
 
   return { classes, inlineStyles };
+}
+
+/**
+ * 継承プロパティが親と同じ値かチェック
+ * 親と同じなら出力不要（trueを返す）
+ */
+function isInherited(
+  prop: keyof NormalizedStyles,
+  styles: NormalizedStyles,
+  parentStyles?: NormalizedStyles,
+): boolean {
+  if (!parentStyles) return false;
+  if (!INHERITED_PROPERTIES.includes(prop)) return false;
+  return styles[prop] === parentStyles[prop];
 }
 
 function mapPositionOffset(
@@ -445,6 +628,8 @@ function mapSize(value: string | undefined, prefix: string, classes: string[]) {
     classes.push(`${prefix}-screen`);
     return;
   }
+  // 0pxはデフォルト値としてスキップ（min-w, min-h）
+  if (prefix.startsWith('min-') && value === '0px') return;
   const px = parsePx(value);
   if (px === null) return;
   if (px in SPACING_MAP) {
@@ -509,7 +694,6 @@ function mapColor(
     classes.push(`${prefix}-transparent`);
     return;
   }
-  // 既知の色
   if (hex === '#ffffff') {
     classes.push(`${prefix}-white`);
     return;
@@ -518,12 +702,10 @@ function mapColor(
     classes.push(`${prefix}-black`);
     return;
   }
-  // Arbitrary hex
   if (hex.startsWith('#')) {
     classes.push(`${prefix}-[${hex}]`);
     return;
   }
-  // rgba等
   if (hex.startsWith('rgba')) {
     classes.push(`${prefix}-[${hex}]`);
     return;
@@ -531,8 +713,6 @@ function mapColor(
 }
 
 function mapBorder(styles: NormalizedStyles, classes: string[]) {
-  // 簡易実装: border-widthだけチェック
-  // computedStyleのborderは "1px solid rgb(...)" 形式
   const borders = [
     styles.borderTop,
     styles.borderRight,
@@ -553,7 +733,7 @@ function mapBorder(styles: NormalizedStyles, classes: string[]) {
     else if (widths[0] === 8) classes.push('border-8');
     else classes.push(`border-[${widths[0]}px]`);
 
-    // Border color from first border
+    // Border color
     const colorMatch = borders[0]?.match(
       /rgba?\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*(?:,\s*[\d.]+)?\s*\)/,
     );
@@ -568,27 +748,12 @@ function mapBorder(styles: NormalizedStyles, classes: string[]) {
 
 function mapBoxShadow(
   value: string | undefined,
-  classes: string[],
+  _classes: string[],
   inlineStyles: Record<string, string>,
 ) {
   if (!value || value === 'none') return;
-  // 簡易: よく使われるシャドウパターンに近似
-  // 複雑なものはfallback
-  if (value.includes('0px 1px 2px') || value.includes('0 1px 2px')) {
-    classes.push('shadow-sm');
-  } else if (value.includes('0px 1px 3px') || value.includes('0 1px 3px')) {
-    classes.push('shadow');
-  } else if (value.includes('0px 4px 6px') || value.includes('0 4px 6px')) {
-    classes.push('shadow-md');
-  } else if (value.includes('0px 10px 15px') || value.includes('0 10px 15px')) {
-    classes.push('shadow-lg');
-  } else if (value.includes('0px 20px 25px') || value.includes('0 20px 25px')) {
-    classes.push('shadow-xl');
-  } else if (value.includes('0px 25px 50px') || value.includes('0 25px 50px')) {
-    classes.push('shadow-2xl');
-  } else {
-    inlineStyles['box-shadow'] = value;
-  }
+  // box-shadow は元の値をそのまま維持する（近似変換による情報損失を避ける）
+  inlineStyles['box-shadow'] = value;
 }
 
 function mapGridTemplate(
@@ -597,7 +762,6 @@ function mapGridTemplate(
   classes: string[],
 ) {
   if (!value || value === 'none') return;
-  // repeat(N, minmax(0, 1fr)) パターンを検出
   const repeatMatch = value.match(
     /^repeat\((\d+),\s*minmax\(0(?:px)?,\s*1fr\)\)$/,
   );
@@ -605,28 +769,41 @@ function mapGridTemplate(
     classes.push(`${prefix}-${repeatMatch[1]}`);
     return;
   }
-  // 単純な 1fr 繰り返し
   const frParts = value.trim().split(/\s+/);
   if (frParts.every((p) => p === '1fr')) {
     classes.push(`${prefix}-${frParts.length}`);
     return;
   }
-  // fallback
   classes.push(`${prefix}-[${value.replace(/\s+/g, '_')}]`);
+}
+
+/**
+ * ExtractedChildをOutputChildに変換する
+ */
+function convertChild(child: ExtractedChild): OutputChild {
+  if (child.type === 'text') {
+    return child;
+  }
+  return convertToOutput(child);
 }
 
 /**
  * ExtractedNodeをOutputNodeに変換する（再帰）
  */
 export function convertToOutput(node: ExtractedNode): OutputNode {
-  const { classes, inlineStyles } = mapStylesToTailwind(node.styles);
+  const { classes, inlineStyles } = mapStylesToTailwind(
+    node.styles,
+    node.tagName,
+    node.parentStyles,
+    node.sizeInfo,
+  );
 
   return {
+    type: 'element',
     tagName: node.tagName,
     attributes: node.attributes,
     classList: classes,
     style: inlineStyles,
-    children: node.children.map(convertToOutput),
-    textContent: node.textContent,
+    children: node.children.map(convertChild),
   };
 }

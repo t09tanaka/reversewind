@@ -4,7 +4,7 @@ import {
   rgbToHex,
   mapStylesToTailwind,
 } from '../src/content/tailwind-mapper';
-import type { NormalizedStyles } from '../src/shared/types';
+import type { NormalizedStyles, SizeInfo } from '../src/shared/types';
 
 describe('parsePx', () => {
   it('parses valid px values', () => {
@@ -57,11 +57,32 @@ describe('mapStylesToTailwind', () => {
     expect(classes).toContain('hidden');
   });
 
+  it('skips default display for tag', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({ display: 'block' }),
+      'div',
+    );
+    expect(classes).not.toContain('block');
+  });
+
+  it('outputs non-default display for tag', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({ display: 'block' }),
+      'span',
+    );
+    expect(classes).toContain('block');
+  });
+
   it('maps position', () => {
     const { classes } = mapStylesToTailwind(
       makeStyles({ position: 'absolute' }),
     );
     expect(classes).toContain('absolute');
+  });
+
+  it('skips position: static', () => {
+    const { classes } = mapStylesToTailwind(makeStyles({ position: 'static' }));
+    expect(classes).not.toContain('static');
   });
 
   it('maps padding', () => {
@@ -108,6 +129,11 @@ describe('mapStylesToTailwind', () => {
     expect(classes).toContain('font-medium');
   });
 
+  it('skips font-weight 400 (normal/default)', () => {
+    const { classes } = mapStylesToTailwind(makeStyles({ fontWeight: '400' }));
+    expect(classes).not.toContain('font-normal');
+  });
+
   it('maps border-radius to standard utility', () => {
     const { classes } = mapStylesToTailwind(
       makeStyles({ borderRadius: '8px' }),
@@ -122,9 +148,23 @@ describe('mapStylesToTailwind', () => {
     expect(classes).toContain('rounded-[10px]');
   });
 
-  it('maps rounded-full', () => {
+  it('maps 9999px to rounded-full', () => {
     const { classes } = mapStylesToTailwind(
       makeStyles({ borderRadius: '9999px' }),
+    );
+    expect(classes).toContain('rounded-full');
+  });
+
+  it('maps 999px to rounded-full', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({ borderRadius: '999px' }),
+    );
+    expect(classes).toContain('rounded-full');
+  });
+
+  it('maps 50% to rounded-full', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({ borderRadius: '50%' }),
     );
     expect(classes).toContain('rounded-full');
   });
@@ -134,6 +174,13 @@ describe('mapStylesToTailwind', () => {
       makeStyles({ backgroundColor: 'rgb(255, 255, 255)' }),
     );
     expect(classes).toContain('bg-white');
+  });
+
+  it('skips transparent background', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({ backgroundColor: 'rgba(0, 0, 0, 0)' }),
+    );
+    expect(classes).not.toContain('bg-transparent');
   });
 
   it('maps text color to hex arbitrary', () => {
@@ -170,6 +217,18 @@ describe('mapStylesToTailwind', () => {
     expect(classes).toContain('items-center');
   });
 
+  it('skips default justify-content and align-items', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({
+        display: 'flex',
+        justifyContent: 'normal',
+        alignItems: 'normal',
+      }),
+    );
+    expect(classes).not.toContain('justify-normal');
+    expect(classes).not.toContain('items-stretch');
+  });
+
   it('maps opacity', () => {
     const { classes } = mapStylesToTailwind(makeStyles({ opacity: '0.5' }));
     expect(classes).toContain('opacity-50');
@@ -189,11 +248,17 @@ describe('mapStylesToTailwind', () => {
     expect(inlineStyles['backdrop-filter']).toBe('blur(10px)');
   });
 
-  it('maps text-align', () => {
+  it('maps text-align center', () => {
     const { classes } = mapStylesToTailwind(
       makeStyles({ textAlign: 'center' }),
     );
     expect(classes).toContain('text-center');
+  });
+
+  it('skips text-align start (default)', () => {
+    const { classes } = mapStylesToTailwind(makeStyles({ textAlign: 'start' }));
+    expect(classes).not.toContain('text-start');
+    expect(classes).not.toContain('text-left');
   });
 
   it('maps whitespace nowrap', () => {
@@ -203,7 +268,7 @@ describe('mapStylesToTailwind', () => {
     expect(classes).toContain('whitespace-nowrap');
   });
 
-  it('maps width to arbitrary value', () => {
+  it('maps width when sizeInfo not provided', () => {
     const { classes } = mapStylesToTailwind(makeStyles({ width: '123px' }));
     expect(classes).toContain('w-[123px]');
   });
@@ -211,5 +276,198 @@ describe('mapStylesToTailwind', () => {
   it('maps width 100% to w-full', () => {
     const { classes } = mapStylesToTailwind(makeStyles({ width: '100%' }));
     expect(classes).toContain('w-full');
+  });
+
+  it('skips min-w-0 and min-h-0 (defaults)', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({ minWidth: '0px', minHeight: '0px' }),
+    );
+    expect(classes).not.toContain('min-w-0');
+    expect(classes).not.toContain('min-h-0');
+  });
+
+  // ─── box-shadow: 元の値を維持 ───
+
+  it('keeps box-shadow as inline style', () => {
+    const { classes, inlineStyles } = mapStylesToTailwind(
+      makeStyles({ boxShadow: 'rgba(0, 0, 0, 0.08) 0px 2px 8px 0px' }),
+    );
+    expect(inlineStyles['box-shadow']).toBe(
+      'rgba(0, 0, 0, 0.08) 0px 2px 8px 0px',
+    );
+    expect(classes).not.toContain('shadow-sm');
+    expect(classes).not.toContain('shadow');
+  });
+
+  // ─── Inherited property tests ───
+
+  it('skips inherited color from parent', () => {
+    const parentStyles: NormalizedStyles = { color: 'rgb(17, 24, 39)' };
+    const { classes } = mapStylesToTailwind(
+      makeStyles({ color: 'rgb(17, 24, 39)' }),
+      'span',
+      parentStyles,
+    );
+    expect(classes).not.toContain('text-[#111827]');
+  });
+
+  it('outputs color when different from parent', () => {
+    const parentStyles: NormalizedStyles = { color: 'rgb(17, 24, 39)' };
+    const { classes } = mapStylesToTailwind(
+      makeStyles({ color: 'rgb(255, 0, 0)' }),
+      'span',
+      parentStyles,
+    );
+    expect(classes).toContain('text-[#ff0000]');
+  });
+
+  it('skips inherited font-size from parent', () => {
+    const parentStyles: NormalizedStyles = { fontSize: '14px' };
+    const { classes } = mapStylesToTailwind(
+      makeStyles({ fontSize: '14px' }),
+      'span',
+      parentStyles,
+    );
+    expect(classes).not.toContain('text-sm');
+  });
+
+  it('skips inherited font-weight from parent', () => {
+    const parentStyles: NormalizedStyles = { fontWeight: '600' };
+    const { classes } = mapStylesToTailwind(
+      makeStyles({ fontWeight: '600' }),
+      'span',
+      parentStyles,
+    );
+    expect(classes).not.toContain('font-semibold');
+  });
+
+  it('skips inherited line-height from parent', () => {
+    const parentStyles: NormalizedStyles = { lineHeight: '21.7px' };
+    const { classes } = mapStylesToTailwind(
+      makeStyles({ lineHeight: '21.7px' }),
+      'span',
+      parentStyles,
+    );
+    expect(classes).not.toContain('leading-[21.7px]');
+  });
+
+  it('skips inherited text-align from parent', () => {
+    const parentStyles: NormalizedStyles = { textAlign: 'center' };
+    const { classes } = mapStylesToTailwind(
+      makeStyles({ textAlign: 'center' }),
+      'span',
+      parentStyles,
+    );
+    expect(classes).not.toContain('text-center');
+  });
+
+  it('outputs color when no parent', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({ color: 'rgb(17, 24, 39)' }),
+      'button',
+    );
+    expect(classes).toContain('text-[#111827]');
+  });
+
+  // ─── Gap normalization tests ───
+
+  it('outputs only gap when row-gap and column-gap match', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({
+        display: 'flex',
+        gap: '8px',
+        rowGap: '8px',
+        columnGap: '8px',
+      }),
+    );
+    expect(classes).toContain('gap-2');
+    expect(classes).not.toContain('gap-y-2');
+    expect(classes).not.toContain('gap-x-2');
+  });
+
+  it('outputs individual gaps when no gap shorthand', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({
+        display: 'flex',
+        gap: '0px',
+        rowGap: '8px',
+        columnGap: '16px',
+      }),
+    );
+    expect(classes).toContain('gap-y-2');
+    expect(classes).toContain('gap-x-4');
+    expect(classes).not.toContain('gap-0');
+  });
+
+  // ─── Size authored tests ───
+
+  it('skips width/height when sizeInfo says not authored', () => {
+    const sizeInfo: SizeInfo = {
+      widthAuthored: false,
+      heightAuthored: false,
+    };
+    const { classes } = mapStylesToTailwind(
+      makeStyles({ width: '188.859px', height: '45.6875px' }),
+      'button',
+      undefined,
+      sizeInfo,
+    );
+    expect(classes).not.toContain('w-[188.859px]');
+    expect(classes).not.toContain('h-[45.6875px]');
+  });
+
+  it('outputs width when sizeInfo says authored', () => {
+    const sizeInfo: SizeInfo = {
+      widthAuthored: true,
+      heightAuthored: false,
+    };
+    const { classes } = mapStylesToTailwind(
+      makeStyles({ width: '300px', height: '45.6875px' }),
+      'button',
+      undefined,
+      sizeInfo,
+    );
+    expect(classes).toContain('w-[300px]');
+    expect(classes).not.toContain('h-[45.6875px]');
+  });
+
+  it('outputs both when sizeInfo says both authored', () => {
+    const sizeInfo: SizeInfo = {
+      widthAuthored: true,
+      heightAuthored: true,
+    };
+    const { classes } = mapStylesToTailwind(
+      makeStyles({ width: '300px', height: '200px' }),
+      'div',
+      undefined,
+      sizeInfo,
+    );
+    expect(classes).toContain('w-[300px]');
+    expect(classes).toContain('h-[200px]');
+  });
+
+  // ─── SVG skip tests ───
+
+  it('returns empty classes for svg elements', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({
+        display: 'inline',
+        color: 'rgb(0, 0, 0)',
+        fontSize: '14px',
+      }),
+      'svg',
+    );
+    expect(classes).toEqual([]);
+  });
+
+  it('returns empty classes for path elements', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({
+        display: 'inline',
+        color: 'rgb(0, 0, 0)',
+      }),
+      'path',
+    );
+    expect(classes).toEqual([]);
   });
 });

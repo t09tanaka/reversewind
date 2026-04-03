@@ -1,10 +1,21 @@
+/** サイズ指定の判定結果 */
+export type SizeInfo = {
+  widthAuthored: boolean;
+  heightAuthored: boolean;
+};
+
+/** 抽出済みの子ノード（要素 or テキスト） */
+export type ExtractedChild = ExtractedNode | { type: 'text'; content: string };
+
 /** 抽出済みDOMノード */
 export type ExtractedNode = {
+  type: 'element';
   tagName: string;
   attributes: Record<string, string>;
-  textContent?: string;
-  children: ExtractedNode[];
+  children: ExtractedChild[];
   styles: NormalizedStyles;
+  parentStyles?: NormalizedStyles;
+  sizeInfo: SizeInfo;
 };
 
 /** 正規化済みスタイル */
@@ -63,14 +74,17 @@ export type NormalizedStyles = {
   fallback?: Record<string, string>;
 };
 
+/** 出力用の子ノード */
+export type OutputChild = OutputNode | { type: 'text'; content: string };
+
 /** 出力用ノード */
 export type OutputNode = {
+  type: 'element';
   tagName: string;
   attributes: Record<string, string>;
   classList: string[];
   style: Record<string, string>;
-  children: OutputNode[];
-  textContent?: string;
+  children: OutputChild[];
 };
 
 /** メッセージ型 */
