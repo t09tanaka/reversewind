@@ -2,7 +2,7 @@
 export const MENU_ID = 'reversewind-copy-as-tailwind';
 
 /** メニュー表示テキスト */
-export const MENU_TITLE = 'Copy as Tailwind';
+export const MENU_TITLE = 'Reversewind: Copy';
 
 /** サブツリー要素数の上限 */
 export const MAX_ELEMENTS = 300;
