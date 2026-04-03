@@ -504,15 +504,17 @@ export function mapStylesToTailwind(
     if (cls) classes.push(cls);
   }
 
-  // Line height — 継承チェック
+  // Line height — ページ全体で設定されることが多いため出力しない
+  // leading-none のみ例外的に出力（意図的な指定の可能性が高い）
   if (
     styles.lineHeight &&
     styles.lineHeight !== 'normal' &&
     !isInherited('lineHeight', styles, parentStyles)
   ) {
-    const px = parsePx(styles.lineHeight);
-    if (px !== null) {
-      classes.push(`leading-[${px}px]`);
+    const lhPx = parsePx(styles.lineHeight);
+    const fsPx = parsePx(styles.fontSize);
+    if (lhPx !== null && fsPx !== null && lhPx === fsPx) {
+      classes.push('leading-none');
     }
   }
 

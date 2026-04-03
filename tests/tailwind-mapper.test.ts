@@ -351,6 +351,29 @@ describe('mapStylesToTailwind', () => {
     expect(classes).not.toContain('leading-[21.7px]');
   });
 
+  // ─── Line height tests ───
+
+  it('outputs leading-none when line-height equals font-size', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({ fontSize: '14px', lineHeight: '14px' }),
+    );
+    expect(classes).toContain('leading-none');
+  });
+
+  it('does not output leading for normal line-heights', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({ lineHeight: '21.7px' }),
+    );
+    const leadingClasses = classes.filter((c) => c.startsWith('leading-'));
+    expect(leadingClasses).toEqual([]);
+  });
+
+  it('does not output leading for standard line-heights', () => {
+    const { classes } = mapStylesToTailwind(makeStyles({ lineHeight: '24px' }));
+    const leadingClasses = classes.filter((c) => c.startsWith('leading-'));
+    expect(leadingClasses).toEqual([]);
+  });
+
   it('skips inherited text-align from parent', () => {
     const parentStyles: NormalizedStyles = { textAlign: 'center' };
     const { classes } = mapStylesToTailwind(
