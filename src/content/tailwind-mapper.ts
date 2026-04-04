@@ -530,10 +530,11 @@ export function mapStylesToTailwind(
     }
   }
 
-  // Text align — 継承チェック。startはデフォルト
+  // Text align — 継承チェック。start/leftはデフォルト
   if (
     styles.textAlign &&
     styles.textAlign !== 'start' &&
+    styles.textAlign !== 'left' &&
     !isInherited('textAlign', styles, parentStyles)
   ) {
     const cls = TEXT_ALIGN_MAP[styles.textAlign];

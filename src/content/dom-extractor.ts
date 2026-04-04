@@ -104,5 +104,11 @@ export function extractSubtree(
     };
   }
 
-  return walk(element, undefined);
+  // ルート要素の親スタイルを取得（ページ全体のデフォルトとの比較用）
+  const parentElement = element.parentElement;
+  const rootParentStyles = parentElement
+    ? extractStyles(parentElement)
+    : undefined;
+
+  return walk(element, rootParentStyles);
 }
