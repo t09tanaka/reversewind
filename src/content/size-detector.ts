@@ -66,11 +66,11 @@ function collectRulesFromList(
     if (rule instanceof CSSStyleRule) {
       out.push(rule);
     } else if (
-      rule instanceof CSSMediaRule ||
-      rule instanceof CSSSupportsRule
+      'cssRules' in rule &&
+      (rule as CSSGroupingRule).cssRules.length > 0
     ) {
-      // ネストされたルールも走査
-      collectRulesFromList(rule.cssRules, out);
+      // CSSMediaRule, CSSSupportsRule, CSSLayerBlockRule 等のネストルールを再帰走査
+      collectRulesFromList((rule as CSSGroupingRule).cssRules, out);
     }
   }
 }

@@ -3,6 +3,7 @@ import {
   parsePx,
   rgbToHex,
   mapStylesToTailwind,
+  convertToOutput,
 } from '../src/content/tailwind-mapper';
 import type { NormalizedStyles, SizeInfo } from '../src/shared/types';
 
@@ -492,5 +493,162 @@ describe('mapStylesToTailwind', () => {
       'path',
     );
     expect(classes).toEqual([]);
+  });
+
+  // ─── Pseudo-class style tests ───
+
+  it('generates hover: prefixed classes for pseudo styles', () => {
+    const node: import('../src/shared/types').ExtractedNode = {
+      type: 'element',
+      tagName: 'button',
+      attributes: {},
+      children: [],
+      styles: {
+        display: 'block',
+        position: 'static',
+        backgroundColor: 'rgb(255, 255, 255)',
+      },
+      sizeInfo: { widthAuthored: false, heightAuthored: false },
+      pseudoStyles: {
+        hover: { backgroundColor: 'rgb(59, 130, 246)' },
+      },
+    };
+
+    const output = convertToOutput(node);
+    expect(output.classList).toContain('bg-white');
+    expect(output.classList).toContain('hover:bg-[#3b82f6]');
+  });
+
+  it('generates multiple pseudo-class prefixes', () => {
+    const node: import('../src/shared/types').ExtractedNode = {
+      type: 'element',
+      tagName: 'button',
+      attributes: {},
+      children: [],
+      styles: {
+        display: 'block',
+        position: 'static',
+        backgroundColor: 'rgb(255, 255, 255)',
+      },
+      sizeInfo: { widthAuthored: false, heightAuthored: false },
+      pseudoStyles: {
+        hover: { backgroundColor: 'rgb(59, 130, 246)' },
+        active: { backgroundColor: 'rgb(29, 78, 216)' },
+      },
+    };
+
+    const output = convertToOutput(node);
+    expect(output.classList).toContain('bg-white');
+    expect(output.classList).toContain('hover:bg-[#3b82f6]');
+    expect(output.classList).toContain('active:bg-[#1d4ed8]');
+  });
+
+  it('groups pseudo classes by property (base → hover → active → ...)', () => {
+    const node: import('../src/shared/types').ExtractedNode = {
+      type: 'element',
+      tagName: 'button',
+      attributes: {},
+      children: [],
+      styles: {
+        display: 'block',
+        position: 'static',
+        backgroundColor: 'rgb(255, 255, 255)',
+        color: 'rgb(0, 0, 0)',
+      },
+      sizeInfo: { widthAuthored: false, heightAuthored: false },
+      pseudoStyles: {
+        hover: {
+          backgroundColor: 'rgb(59, 130, 246)',
+          color: 'rgb(255, 255, 255)',
+        },
+        active: { backgroundColor: 'rgb(29, 78, 216)' },
+      },
+    };
+
+    const output = convertToOutput(node);
+    const bgWhiteIdx = output.classList.indexOf('bg-white');
+    const hoverBgIdx = output.classList.indexOf('hover:bg-[#3b82f6]');
+    const activeBgIdx = output.classList.indexOf('active:bg-[#1d4ed8]');
+    const textBlackIdx = output.classList.indexOf('text-black');
+    const hoverTextIdx = output.classList.indexOf('hover:text-white');
+
+    expect(bgWhiteIdx).toBeGreaterThanOrEqual(0);
+    expect(hoverBgIdx).toBeGreaterThanOrEqual(0);
+    expect(activeBgIdx).toBeGreaterThanOrEqual(0);
+    expect(textBlackIdx).toBeGreaterThanOrEqual(0);
+    expect(hoverTextIdx).toBeGreaterThanOrEqual(0);
+
+    expect(bgWhiteIdx).toBeLessThan(hoverBgIdx);
+    expect(hoverBgIdx).toBeLessThan(activeBgIdx);
+    expect(activeBgIdx).toBeLessThan(textBlackIdx);
+    expect(textBlackIdx).toBeLessThan(hoverTextIdx);
+  });
+
+  it('does not generate pseudo inline styles', () => {
+    const node: import('../src/shared/types').ExtractedNode = {
+      type: 'element',
+      tagName: 'button',
+      attributes: {},
+      children: [],
+      styles: { display: 'block', position: 'static' },
+      sizeInfo: { widthAuthored: false, heightAuthored: false },
+      pseudoStyles: {
+        hover: { backgroundColor: 'rgb(59, 130, 246)' },
+      },
+    };
+
+    const output = convertToOutput(node);
+    expect(Object.keys(output.style)).toEqual([]);
+  });
+
+  it('skips pseudo styles for SVG elements', () => {
+    const node: import('../src/shared/types').ExtractedNode = {
+      type: 'element',
+      tagName: 'svg',
+      attributes: {},
+      children: [],
+      styles: { display: 'inline', position: 'static' },
+      sizeInfo: { widthAuthored: false, heightAuthored: false },
+      pseudoStyles: {
+        hover: { color: 'rgb(255, 0, 0)' },
+      },
+    };
+
+    const output = convertToOutput(node);
+    expect(output.classList).toEqual([]);
+  });
+
+  it('handles focus-visible prefix', () => {
+    const node: import('../src/shared/types').ExtractedNode = {
+      type: 'element',
+      tagName: 'input',
+      attributes: {},
+      children: [],
+      styles: { display: 'inline-block', position: 'static' },
+      sizeInfo: { widthAuthored: false, heightAuthored: false },
+      pseudoStyles: {
+        'focus-visible': { backgroundColor: 'rgb(240, 240, 255)' },
+      },
+    };
+
+    const output = convertToOutput(node);
+    expect(output.classList).toContain('focus-visible:bg-[#f0f0ff]');
+  });
+
+  it('handles focus-within prefix', () => {
+    const node: import('../src/shared/types').ExtractedNode = {
+      type: 'element',
+      tagName: 'div',
+      attributes: {},
+      children: [],
+      styles: { display: 'block', position: 'static' },
+      sizeInfo: { widthAuthored: false, heightAuthored: false },
+      pseudoStyles: {
+        'focus-within': { backgroundColor: 'rgb(240, 240, 240)' },
+      },
+    };
+
+    const output = convertToOutput(node);
+    expect(output.classList).toContain('focus-within:bg-[#f0f0f0]');
   });
 });

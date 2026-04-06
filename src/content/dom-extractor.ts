@@ -4,7 +4,7 @@ import {
   EVENT_PREFIX,
   SVG_ELEMENTS,
 } from '../shared/constants';
-import { extractStyles } from './style-extractor';
+import { extractStyles, extractPseudoStyles } from './style-extractor';
 import { detectAuthoredSize } from './size-detector';
 import type {
   ExtractedNode,
@@ -78,7 +78,14 @@ export function extractSubtree(
 
     const tagName = el.tagName.toLowerCase();
     const isSvg = SVG_ELEMENTS.has(tagName);
-    const styles = extractStyles(el);
+    let styles = extractStyles(el);
+    const pseudoResult = isSvg ? undefined : extractPseudoStyles(el);
+    const pseudoStyles = pseudoResult?.pseudoStyles;
+
+    // 疑似クラスが変更するプロパティのbase値を通常ルールの値で補正（hover汚染対策）
+    if (pseudoResult?.baseCorrections) {
+      styles = { ...styles, ...pseudoResult.baseCorrections };
+    }
     const sizeInfo = detectAuthoredSize(el);
     const children: ExtractedChild[] = [];
 
@@ -101,6 +108,7 @@ export function extractSubtree(
       styles,
       parentStyles,
       sizeInfo,
+      pseudoStyles,
     };
   }
 

@@ -6,7 +6,10 @@ import type {
   OutputNode,
   OutputChild,
   SizeInfo,
+  PseudoClass,
 } from '../shared/types';
+
+import { PSEUDO_CLASS_LIST } from './style-extractor';
 
 // ─── Spacing scale (px → Tailwind) ───
 const SPACING_MAP: Record<number, string> = {
@@ -476,7 +479,7 @@ export function mapStylesToTailwind(
     }
   }
 
-  // Border
+  // Border (width + color)
   mapBorder(styles, classes);
 
   // Box shadow
@@ -736,16 +739,23 @@ function mapBorder(styles: NormalizedStyles, classes: string[]) {
     else if (widths[0] === 8) classes.push('border-8');
     else classes.push(`border-[${widths[0]}px]`);
 
-    // Border color
-    const colorMatch = borders[0]?.match(
-      /rgba?\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*(?:,\s*[\d.]+)?\s*\)/,
-    );
-    if (colorMatch) {
-      const hex = rgbToHex(colorMatch[0]);
-      if (hex !== '#000000') {
-        classes.push(`border-[${hex}]`);
+    // Border color (from shorthand)
+    if (!styles.borderColor) {
+      const colorMatch = borders[0]?.match(
+        /rgba?\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*(?:,\s*[\d.]+)?\s*\)/,
+      );
+      if (colorMatch) {
+        const hex = rgbToHex(colorMatch[0]);
+        if (hex !== '#000000') {
+          classes.push(`border-[${hex}]`);
+        }
       }
     }
+  }
+
+  // Border color (独立指定 — base補正やpseudo-classのborder-color変更用)
+  if (styles.borderColor) {
+    mapColor(styles.borderColor, 'border', classes);
   }
 }
 
@@ -791,21 +801,116 @@ function convertChild(child: ExtractedChild): OutputChild {
 }
 
 /**
+ * Tailwindクラスからプロパティプレフィックスを抽出する。
+ * "bg-white" → "bg", "text-sm" → "text", "p-4" → "p",
+ * "rounded-lg" → "rounded", "font-bold" → "font"
+ */
+function extractClassPrefix(cls: string): string {
+  const arbMatch = cls.match(/^(-?[a-z]+(?:-[a-z]+)*?)-\[/);
+  if (arbMatch) return arbMatch[1];
+  const dashIdx = cls.indexOf('-');
+  if (dashIdx === -1) return cls;
+  return cls.substring(0, dashIdx);
+}
+
+/**
+ * ベースクラスと疑似クラスのクラスをプロパティグループ単位でインターリーブする。
+ * 例: bg-white hover:bg-blue-500 active:bg-blue-700 text-black hover:text-white
+ */
+function interleaveWithPseudo(
+  baseClasses: string[],
+  pseudoClassMap: Map<PseudoClass, string[]>,
+): string[] {
+  if (pseudoClassMap.size === 0) return baseClasses;
+
+  // 各ベースクラスのプレフィックスの最後の出現位置を記録
+  const lastPrefixIndex = new Map<string, number>();
+  for (let i = 0; i < baseClasses.length; i++) {
+    lastPrefixIndex.set(extractClassPrefix(baseClasses[i]), i);
+  }
+
+  // 各ベースクラスの後に挿入する疑似クラスを事前計算
+  // 同じプレフィックスの最後のベースクラスの後に疑似クラスを配置
+  const insertAfter = new Map<number, string[]>();
+  for (const pc of PSEUDO_CLASS_LIST) {
+    const pseudoClasses = pseudoClassMap.get(pc);
+    if (!pseudoClasses) continue;
+
+    for (const pseudoClass of pseudoClasses) {
+      const unprefixed = pseudoClass.replace(/^[a-z][-a-z]*:/, '');
+      const pseudoPrefix = extractClassPrefix(unprefixed);
+      const lastIdx = lastPrefixIndex.get(pseudoPrefix);
+
+      if (lastIdx !== undefined) {
+        const existing = insertAfter.get(lastIdx) ?? [];
+        existing.push(pseudoClass);
+        insertAfter.set(lastIdx, existing);
+      } else {
+        // マッチするベースクラスがない場合は末尾に追加
+        const existing = insertAfter.get(-1) ?? [];
+        existing.push(pseudoClass);
+        insertAfter.set(-1, existing);
+      }
+    }
+  }
+
+  // ベースク���スを順に出力し、対応する疑似クラスを挿入
+  const result: string[] = [];
+  for (let i = 0; i < baseClasses.length; i++) {
+    result.push(baseClasses[i]);
+    const toInsert = insertAfter.get(i);
+    if (toInsert) {
+      result.push(...toInsert);
+    }
+  }
+
+  // マッチしなかった疑似クラスを末尾に追加
+  const remaining = insertAfter.get(-1);
+  if (remaining) {
+    result.push(...remaining);
+  }
+
+  return result;
+}
+
+/**
  * ExtractedNodeをOutputNodeに変換する（再帰）
  */
 export function convertToOutput(node: ExtractedNode): OutputNode {
-  const { classes, inlineStyles } = mapStylesToTailwind(
+  const { classes: baseClasses, inlineStyles } = mapStylesToTailwind(
     node.styles,
     node.tagName,
     node.parentStyles,
     node.sizeInfo,
   );
 
+  // 疑似クラスの差分クラスを生成
+  const pseudoClassMap = new Map<PseudoClass, string[]>();
+  if (node.pseudoStyles && !SVG_ELEMENTS.has(node.tagName)) {
+    for (const pc of PSEUDO_CLASS_LIST) {
+      const pseudoStyle = node.pseudoStyles[pc];
+      if (!pseudoStyle) continue;
+
+      const { classes: pseudoClasses } = mapStylesToTailwind(
+        pseudoStyle as NormalizedStyles,
+        node.tagName,
+      );
+      if (pseudoClasses.length > 0) {
+        pseudoClassMap.set(
+          pc,
+          pseudoClasses.map((cls) => `${pc}:${cls}`),
+        );
+      }
+    }
+  }
+
+  const classList = interleaveWithPseudo(baseClasses, pseudoClassMap);
+
   return {
     type: 'element',
     tagName: node.tagName,
     attributes: node.attributes,
-    classList: classes,
+    classList,
     style: inlineStyles,
     children: node.children.map(convertChild),
   };

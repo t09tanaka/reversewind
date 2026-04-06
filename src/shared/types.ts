@@ -4,6 +4,19 @@ export type SizeInfo = {
   heightAuthored: boolean;
 };
 
+/** 対応する疑似クラス */
+export type PseudoClass =
+  | 'hover'
+  | 'active'
+  | 'focus'
+  | 'focus-visible'
+  | 'focus-within';
+
+/** 疑似クラスごとのスタイル差分 */
+export type PseudoStyleMap = Partial<
+  Record<PseudoClass, Partial<NormalizedStyles>>
+>;
+
 /** 抽出済みの子ノード（要素 or テキスト） */
 export type ExtractedChild = ExtractedNode | { type: 'text'; content: string };
 
@@ -16,6 +29,7 @@ export type ExtractedNode = {
   styles: NormalizedStyles;
   parentStyles?: NormalizedStyles;
   sizeInfo: SizeInfo;
+  pseudoStyles?: PseudoStyleMap;
 };
 
 /** 正規化済みスタイル */
@@ -38,6 +52,7 @@ export type NormalizedStyles = {
   borderRight?: string;
   borderBottom?: string;
   borderLeft?: string;
+  borderColor?: string;
   fontSize?: string;
   fontWeight?: string;
   fontFamily?: string;
