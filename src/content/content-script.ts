@@ -1,4 +1,5 @@
 import { selectionStore } from './selection-store';
+import { findMeaningfulAncestor } from './bubble-up';
 import { extractSubtree } from './dom-extractor';
 import { convertToOutput } from './tailwind-mapper';
 import { generateHtml } from './html-generator';
@@ -15,7 +16,7 @@ import type { ReversewindMessage } from '../shared/types';
 document.addEventListener('contextmenu', (e) => {
   const target = e.target;
   if (target instanceof Element) {
-    selectionStore.set(target);
+    selectionStore.set(findMeaningfulAncestor(target));
   }
 });
 
