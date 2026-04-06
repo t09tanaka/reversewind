@@ -11,91 +11,107 @@ import {
 } from '../shared/constants';
 import type { ReversewindMessage } from '../shared/types';
 
-// 右クリック対象要素を保持
-document.addEventListener('contextmenu', (e) => {
-  const target = e.target;
-  if (target instanceof Element) {
-    selectionStore.set(target);
-  }
-});
+// executeScript による多重注入を防止
+// webpack バンドルは IIFE なので、同じスクリプトが再注入されるとリスナーが重複する
+const INIT_FLAG = '__reversewind_initialized__';
+const win = window as unknown as Record<string, unknown>;
+if (win[INIT_FLAG]) {
+  // 既に初期化済み — 何もしない（以降のコードはブロック内なのでスキップされる）
+} else {
+  win[INIT_FLAG] = true;
 
-/**
- * 対象要素を一時的にハイライトする（オーバーレイ方式）
- * 元ページの要素スタイルを変更せず、上に被せるdivで表現する
- */
-function highlightElement(element: Element): () => void {
-  const rect = element.getBoundingClientRect();
-  const overlay = document.createElement('div');
-
-  overlay.style.cssText = [
-    'position: fixed',
-    `top: ${rect.top - 2}px`,
-    `left: ${rect.left - 2}px`,
-    `width: ${rect.width + 4}px`,
-    `height: ${rect.height + 4}px`,
-    'border: 2px solid #10b981',
-    'border-radius: 4px',
-    'pointer-events: none',
-    'z-index: 2147483646',
-    'box-shadow: 0 0 8px rgba(16, 185, 129, 0.4)',
-    'transition: opacity 0.2s ease',
-    'opacity: 1',
-  ].join('; ');
-
-  document.body.appendChild(overlay);
-
-  return () => {
-    overlay.style.opacity = '0';
-    setTimeout(() => overlay.remove(), 200);
+  // Service Worker 側の executeScript から対象要素を直接セットするためのグローバル関数
+  // content script 未注入時に :hover で検出した要素を渡すために使用する
+  win.__reversewind_set_target__ = (el: Element) => {
+    selectionStore.set(el);
   };
-}
 
-// Service Workerからのメッセージを受信
-chrome.runtime.onMessage.addListener(
-  (message: ReversewindMessage, _sender, sendResponse) => {
-    if (message.type !== 'REVERSEWIND_CONVERT') return;
-
-    try {
-      const element = selectionStore.get();
-      if (!element) {
-        showToast(TOAST_MESSAGES.TARGET_NOT_FOUND, 'error');
-        sendResponse({ success: false, error: 'target not found' });
-        return;
-      }
-
-      const extracted = extractSubtree(element, MAX_ELEMENTS);
-      const output = convertToOutput(extracted);
-      const html = generateHtml(output);
-
-      copyToClipboard(html)
-        .then(() => {
-          showToast(TOAST_MESSAGES.SUCCESS, 'success');
-
-          // コピー成功時にハイライト表示
-          const removeHighlight = highlightElement(element);
-          setTimeout(removeHighlight, TOAST_DURATION);
-
-          sendResponse({ success: true });
-        })
-        .catch((err) => {
-          console.error('[Reversewind] copy failed:', err);
-          showToast(TOAST_MESSAGES.COPY_FAILED, 'error');
-          sendResponse({ success: false, error: 'copy failed' });
-        });
-
-      // 非同期レスポンスのためtrueを返す
-      return true;
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'unknown error';
-      console.error('[Reversewind] error:', message);
-
-      if (message.includes('too large')) {
-        showToast(TOAST_MESSAGES.SUBTREE_TOO_LARGE, 'error');
-      } else {
-        showToast(TOAST_MESSAGES.COPY_FAILED, 'error');
-      }
-
-      sendResponse({ success: false, error: message });
+  // 右クリック対象要素を保持
+  document.addEventListener('contextmenu', (e) => {
+    const target = e.target;
+    if (target instanceof Element) {
+      selectionStore.set(target);
     }
-  },
-);
+  });
+
+  /**
+   * 対象要素を一時的にハイライトする（オーバーレイ方式）
+   * 元ページの要素スタイルを変更せず、上に被せるdivで表現する
+   */
+  function highlightElement(element: Element): () => void {
+    const rect = element.getBoundingClientRect();
+    const overlay = document.createElement('div');
+
+    overlay.style.cssText = [
+      'position: fixed',
+      `top: ${rect.top - 2}px`,
+      `left: ${rect.left - 2}px`,
+      `width: ${rect.width + 4}px`,
+      `height: ${rect.height + 4}px`,
+      'border: 2px solid #10b981',
+      'border-radius: 4px',
+      'pointer-events: none',
+      'z-index: 2147483646',
+      'box-shadow: 0 0 8px rgba(16, 185, 129, 0.4)',
+      'transition: opacity 0.2s ease',
+      'opacity: 1',
+    ].join('; ');
+
+    document.body.appendChild(overlay);
+
+    return () => {
+      overlay.style.opacity = '0';
+      setTimeout(() => overlay.remove(), 200);
+    };
+  }
+
+  // Service Workerからのメッセージを受信
+  chrome.runtime.onMessage.addListener(
+    (message: ReversewindMessage, _sender, sendResponse) => {
+      if (message.type !== 'REVERSEWIND_CONVERT') return;
+
+      try {
+        const element = selectionStore.get();
+        if (!element) {
+          showToast(TOAST_MESSAGES.TARGET_NOT_FOUND, 'error');
+          sendResponse({ success: false, error: 'target not found' });
+          return;
+        }
+
+        const extracted = extractSubtree(element, MAX_ELEMENTS);
+        const output = convertToOutput(extracted);
+        const html = generateHtml(output);
+
+        copyToClipboard(html)
+          .then(() => {
+            showToast(TOAST_MESSAGES.SUCCESS, 'success');
+
+            // コピー成功時にハイライト表示
+            const removeHighlight = highlightElement(element);
+            setTimeout(removeHighlight, TOAST_DURATION);
+
+            sendResponse({ success: true });
+          })
+          .catch((err) => {
+            console.error('[Reversewind] copy failed:', err);
+            showToast(TOAST_MESSAGES.COPY_FAILED, 'error');
+            sendResponse({ success: false, error: 'copy failed' });
+          });
+
+        // 非同期レスポンスのためtrueを返す
+        return true;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'unknown error';
+        console.error('[Reversewind] error:', message);
+
+        if (message.includes('too large')) {
+          showToast(TOAST_MESSAGES.SUBTREE_TOO_LARGE, 'error');
+        } else {
+          showToast(TOAST_MESSAGES.COPY_FAILED, 'error');
+        }
+
+        sendResponse({ success: false, error: message });
+      }
+    },
+  );
+}
