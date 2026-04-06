@@ -3,6 +3,7 @@ import {
   extractPseudoStylesFromRule,
   PSEUDO_CLASS_LIST,
   parsePseudoSelector,
+  extractCssVarName,
 } from '../src/content/style-extractor';
 
 describe('PSEUDO_CLASS_LIST', () => {
@@ -173,5 +174,21 @@ describe('extractPseudoStylesFromRule', () => {
   it('returns null for empty rule style', () => {
     const result = extractPseudoStylesFromRule('.btn:hover', {});
     expect(result).toBeNull();
+  });
+});
+
+describe('extractCssVarName', () => {
+  it('extracts CSS variable name from cssText', () => {
+    expect(extractCssVarName('border-color: var(--ds-gray-500);')).toBe(
+      '--ds-gray-500',
+    );
+  });
+
+  it('returns null when no var()', () => {
+    expect(extractCssVarName('border-color: red;')).toBeNull();
+  });
+
+  it('extracts first var from multiple', () => {
+    expect(extractCssVarName('color: var(--a); bg: var(--b);')).toBe('--a');
   });
 });

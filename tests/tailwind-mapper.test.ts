@@ -651,4 +651,89 @@ describe('mapStylesToTailwind', () => {
     const output = convertToOutput(node);
     expect(output.classList).toContain('focus-within:bg-[#f0f0f0]');
   });
+
+  // ─── borderColor tests ───
+
+  it('outputs border color from borderColor field', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({
+        borderTop: '1px solid rgb(0, 0, 0)',
+        borderRight: '1px solid rgb(0, 0, 0)',
+        borderBottom: '1px solid rgb(0, 0, 0)',
+        borderLeft: '1px solid rgb(0, 0, 0)',
+        borderColor: 'rgb(216, 225, 234)',
+      }),
+    );
+    expect(classes).toContain('border');
+    expect(classes).toContain('border-[#d8e1ea]');
+  });
+
+  it('borderColor overrides shorthand border color', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({
+        borderTop: '1px solid rgb(255, 0, 0)',
+        borderRight: '1px solid rgb(255, 0, 0)',
+        borderBottom: '1px solid rgb(255, 0, 0)',
+        borderLeft: '1px solid rgb(255, 0, 0)',
+        borderColor: 'rgb(0, 0, 255)',
+      }),
+    );
+    expect(classes).toContain('border');
+    expect(classes).toContain('border-[#0000ff]');
+    expect(classes).not.toContain('border-[#ff0000]');
+  });
+
+  // ─── transform tests ───
+
+  it('maps transform scale', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({ transform: 'matrix(0.98, 0, 0, 0.98, 0, 0)' }),
+    );
+    expect(classes).toContain('scale-[0.98]');
+  });
+
+  it('maps known transform scale', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({ transform: 'matrix(0.95, 0, 0, 0.95, 0, 0)' }),
+    );
+    expect(classes).toContain('scale-95');
+  });
+
+  it('skips transform none', () => {
+    const { classes } = mapStylesToTailwind(makeStyles({ transform: 'none' }));
+    expect(
+      classes.filter((c) => c.includes('scale') || c.includes('transform')),
+    ).toEqual([]);
+  });
+
+  it('falls back non-scale transform to inline style', () => {
+    const { inlineStyles } = mapStylesToTailwind(
+      makeStyles({ transform: 'rotate(45deg)' }),
+    );
+    expect(inlineStyles['transform']).toBe('rotate(45deg)');
+  });
+
+  // ─── transition tests ───
+
+  it('maps transition-all', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({ transition: 'all 0.15s ease 0s' }),
+    );
+    expect(classes).toContain('transition-all');
+  });
+
+  it('maps transition with custom duration', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({ transition: 'all 0.3s ease 0s' }),
+    );
+    expect(classes).toContain('transition-all');
+    expect(classes).toContain('duration-300');
+  });
+
+  it('skips transition none', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({ transition: 'all 0s ease 0s' }),
+    );
+    expect(classes.filter((c) => c.includes('transition'))).toEqual([]);
+  });
 });

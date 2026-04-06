@@ -148,6 +148,8 @@ export function extractStyles(element: Element): NormalizedStyles {
     gridTemplateRows: cs.gridTemplateRows,
     gridColumn: cs.gridColumn,
     gridRow: cs.gridRow,
+    transform: cs.transform,
+    transition: cs.transition,
     fallback: Object.keys(fallback).length > 0 ? fallback : undefined,
   };
 }
@@ -213,6 +215,8 @@ const CSS_TO_NORMALIZED: Record<string, keyof NormalizedStyles> = {
   'border-bottom': 'borderBottom',
   'border-left': 'borderLeft',
   'border-color': 'borderColor',
+  transform: 'transform',
+  transition: 'transition',
 };
 
 /** parsePseudoSelector の戻り値 */
@@ -339,7 +343,7 @@ export function extractPseudoStylesFromRule(
  * 例: "border-color: var(--ds-gray-500);" → "--ds-gray-500"
  * 複数の var() がある場合は最初の1つを返す（通常は同じ変数を使う）。
  */
-function extractCssVarName(cssText: string): string | null {
+export function extractCssVarName(cssText: string): string | null {
   const match = cssText.match(/var\((--[^)]+)\)/);
   return match ? match[1] : null;
 }

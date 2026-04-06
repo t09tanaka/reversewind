@@ -579,6 +579,68 @@ export function mapStylesToTailwind(
       classes.push('whitespace-break-spaces');
   }
 
+  // Transform — none はデフォルト
+  if (styles.transform && styles.transform !== 'none') {
+    // scale
+    const scaleMatch = styles.transform.match(
+      /^matrix\(([\d.]+),\s*0,\s*0,\s*([\d.]+)/,
+    );
+    if (scaleMatch) {
+      const sx = parseFloat(scaleMatch[1]);
+      const sy = parseFloat(scaleMatch[2]);
+      if (sx === sy && sx !== 1) {
+        // Known scales
+        const knownScales = [0, 0.5, 0.75, 0.9, 0.95, 1, 1.05, 1.1, 1.25, 1.5];
+        if (knownScales.includes(sx)) {
+          classes.push(`scale-${Math.round(sx * 100)}`);
+        } else {
+          classes.push(`scale-[${sx}]`);
+        }
+      }
+    } else {
+      // その他の transform は inline style にフォールバック
+      inlineStyles['transform'] = styles.transform;
+    }
+  }
+
+  // Transition — none はデフォルト
+  if (
+    styles.transition &&
+    styles.transition !== 'none' &&
+    !styles.transition.startsWith('all 0s')
+  ) {
+    // Tailwind transition utilities
+    if (styles.transition.startsWith('all ')) {
+      classes.push('transition-all');
+    } else if (
+      styles.transition.startsWith('color') ||
+      styles.transition.startsWith('background-color')
+    ) {
+      classes.push('transition-colors');
+    } else if (styles.transition.startsWith('opacity')) {
+      classes.push('transition-opacity');
+    } else if (styles.transition.startsWith('box-shadow')) {
+      classes.push('transition-shadow');
+    } else if (styles.transition.startsWith('transform')) {
+      classes.push('transition-transform');
+    } else {
+      classes.push('transition');
+    }
+
+    // Duration
+    const durationMatch = styles.transition.match(/([\d.]+)s/);
+    if (durationMatch) {
+      const ms = Math.round(parseFloat(durationMatch[1]) * 1000);
+      const knownDurations = [75, 100, 150, 200, 300, 500, 700, 1000];
+      if (ms !== 150 && knownDurations.includes(ms)) {
+        classes.push(`duration-${ms}`);
+      } else if (ms !== 150 && !knownDurations.includes(ms)) {
+        classes.push(`duration-[${ms}ms]`);
+      }
+      // 150ms is default, skip
+    }
+  }
+
   // Fallback styles
   if (styles.fallback) {
     for (const [prop, value] of Object.entries(styles.fallback)) {

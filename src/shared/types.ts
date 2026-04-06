@@ -86,6 +86,8 @@ export type NormalizedStyles = {
   gridTemplateRows?: string;
   gridColumn?: string;
   gridRow?: string;
+  transform?: string;
+  transition?: string;
   fallback?: Record<string, string>;
 };
 
