@@ -148,6 +148,7 @@ export function extractStyles(element: Element): NormalizedStyles {
     gridTemplateRows: cs.gridTemplateRows,
     gridColumn: cs.gridColumn,
     gridRow: cs.gridRow,
+    scale: cs.getPropertyValue('scale'),
     transform: cs.transform,
     transition: cs.transition,
     fallback: Object.keys(fallback).length > 0 ? fallback : undefined,
@@ -215,6 +216,7 @@ const CSS_TO_NORMALIZED: Record<string, keyof NormalizedStyles> = {
   'border-bottom': 'borderBottom',
   'border-left': 'borderLeft',
   'border-color': 'borderColor',
+  scale: 'scale',
   transform: 'transform',
   transition: 'transition',
 };

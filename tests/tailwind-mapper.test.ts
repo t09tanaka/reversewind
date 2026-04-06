@@ -683,6 +683,28 @@ describe('mapStylesToTailwind', () => {
     expect(classes).not.toContain('border-[#ff0000]');
   });
 
+  // ─── scale property tests ───
+
+  it('maps CSS scale property', () => {
+    const { classes } = mapStylesToTailwind(makeStyles({ scale: '0.98' }));
+    expect(classes).toContain('scale-[0.98]');
+  });
+
+  it('maps known CSS scale property', () => {
+    const { classes } = mapStylesToTailwind(makeStyles({ scale: '0.95' }));
+    expect(classes).toContain('scale-95');
+  });
+
+  it('skips scale none', () => {
+    const { classes } = mapStylesToTailwind(makeStyles({ scale: 'none' }));
+    expect(classes.filter((c) => c.includes('scale'))).toEqual([]);
+  });
+
+  it('skips scale 1', () => {
+    const { classes } = mapStylesToTailwind(makeStyles({ scale: '1' }));
+    expect(classes.filter((c) => c.includes('scale'))).toEqual([]);
+  });
+
   // ─── transform tests ───
 
   it('maps transform scale', () => {
