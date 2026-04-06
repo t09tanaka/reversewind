@@ -19,7 +19,7 @@ Right-click any element on a web page and instantly copy it as clean HTML with T
 
 ### Chrome Web Store
 
-Coming soon.
+[Install from Chrome Web Store](https://chromewebstore.google.com/detail/reversewind/nacafidpnkedkhhefdpkhjcijdabgolj)
 
 ### Manual (Developer Mode)
 
