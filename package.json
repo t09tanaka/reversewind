@@ -1,6 +1,6 @@
 {
   "name": "reversewind",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "private": true,
   "description": "Copy any web element as HTML + Tailwind CSS from the right-click menu",
   "scripts": {
