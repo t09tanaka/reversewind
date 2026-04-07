@@ -157,8 +157,11 @@ chrome.runtime.onMessage.addListener(
         return;
       }
 
-      // bodyが選択された場合はページ全体コピー、それ以外はコンポーネントコピー
-      if (element === document.body) {
+      // bodyまたはbody直下の要素が選択された場合はページ全体コピー
+      if (
+        element === document.body ||
+        element.parentElement === document.body
+      ) {
         return copyPage(sendResponse);
       }
 
