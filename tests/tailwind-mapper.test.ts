@@ -718,6 +718,54 @@ describe('mapStylesToTailwind', () => {
     expect(classes).toContain('border-[#c8c8c8]');
   });
 
+  // ─── background-image (gradient) tests ───
+
+  it('converts linear-gradient to Tailwind gradient classes', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({
+        backgroundImage:
+          'linear-gradient(to right bottom, rgb(254, 252, 232) 0%, rgb(255, 247, 237) 100%)',
+      }),
+    );
+    expect(classes).toContain('bg-gradient-to-br');
+    expect(classes).toContain('from-[#fefce8]');
+    expect(classes).toContain('to-[#fff7ed]');
+  });
+
+  it('converts linear-gradient to-right to bg-gradient-to-r', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({
+        backgroundImage:
+          'linear-gradient(to right, rgb(240, 253, 244) 0%, rgb(236, 254, 255) 100%)',
+      }),
+    );
+    expect(classes).toContain('bg-gradient-to-r');
+    expect(classes).toContain('from-[#f0fdf4]');
+    expect(classes).toContain('to-[#ecfeff]');
+  });
+
+  it('falls back to inline style for non-standard gradients', () => {
+    const { inlineStyles } = mapStylesToTailwind(
+      makeStyles({
+        backgroundImage:
+          'linear-gradient(135deg, rgb(255, 0, 0) 0%, rgb(0, 0, 255) 100%)',
+      }),
+    );
+    expect(inlineStyles['background-image']).toBeDefined();
+  });
+
+  it('skips backgroundImage when none', () => {
+    const { classes, inlineStyles } = mapStylesToTailwind(
+      makeStyles({
+        backgroundImage: 'none',
+      }),
+    );
+    expect(classes).not.toContain('bg-gradient-to-br');
+    expect(inlineStyles['background-image']).toBeUndefined();
+  });
+
+  // ─── per-side border color tests ───
+
   it('outputs per-side border colors when sides differ', () => {
     const { classes } = mapStylesToTailwind(
       makeStyles({

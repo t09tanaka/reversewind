@@ -466,6 +466,11 @@ export function mapStylesToTailwind(
     mapGridTemplate(styles.gridTemplateRows, 'grid-rows', classes);
   }
 
+  // Background image (gradient等)
+  if (styles.backgroundImage && styles.backgroundImage !== 'none') {
+    mapBackgroundImage(styles.backgroundImage, classes, inlineStyles);
+  }
+
   // Background color — transparent はデフォルト
   if (
     styles.backgroundColor &&
@@ -903,6 +908,83 @@ function mapBorder(styles: NormalizedStyles, classes: string[]) {
   if (styles.borderColor) {
     mapColor(styles.borderColor, 'border', classes);
   }
+}
+
+const GRADIENT_DIRECTION_MAP: Record<string, string> = {
+  'to top': 'bg-gradient-to-t',
+  'to top right': 'bg-gradient-to-tr',
+  'to right': 'bg-gradient-to-r',
+  'to right bottom': 'bg-gradient-to-br',
+  'to bottom right': 'bg-gradient-to-br',
+  'to bottom': 'bg-gradient-to-b',
+  'to bottom left': 'bg-gradient-to-bl',
+  'to left': 'bg-gradient-to-l',
+  'to top left': 'bg-gradient-to-tl',
+  'to left top': 'bg-gradient-to-tl',
+};
+
+function mapBackgroundImage(
+  value: string,
+  classes: string[],
+  inlineStyles: Record<string, string>,
+) {
+  // linear-gradient のパース — 括弧内のカンマを考慮してトップレベルのカンマで分割
+  const lgPrefix = 'linear-gradient(';
+  if (value.startsWith(lgPrefix) && value.endsWith(')')) {
+    const inner = value.slice(lgPrefix.length, -1);
+    const parts: string[] = [];
+    let depth = 0;
+    let current = '';
+    for (const ch of inner) {
+      if (ch === '(') depth++;
+      else if (ch === ')') depth--;
+      if (ch === ',' && depth === 0) {
+        parts.push(current.trim());
+        current = '';
+      } else {
+        current += ch;
+      }
+    }
+    parts.push(current.trim());
+
+    if (parts.length >= 3) {
+      const direction = parts[0];
+      const twDirection = GRADIENT_DIRECTION_MAP[direction];
+      if (twDirection) {
+        const stops = parts.slice(1);
+        const colors = stops.map((stop) => {
+          const colorPart = stop.replace(/\s+\d+%$/, '').trim();
+          return rgbToHex(colorPart);
+        });
+
+        if (
+          colors.length >= 2 &&
+          colors.every(
+            (c) =>
+              c !== 'transparent' &&
+              !c.includes('oklch') &&
+              !c.includes('oklab'),
+          )
+        ) {
+          classes.push(twDirection);
+          classes.push(`from-[${colors[0]}]`);
+          if (colors.length === 3) {
+            classes.push(`via-[${colors[1]}]`);
+            classes.push(`to-[${colors[2]}]`);
+          } else {
+            classes.push(`to-[${colors[colors.length - 1]}]`);
+          }
+          return;
+        }
+      }
+    }
+  }
+
+  // フォールバック: oklch/oklab色をhexに変換してinline style
+  const converted = value.replace(/oklch?\([^)]+\)|oklab?\([^)]+\)/g, (match) =>
+    normalizeColor(match),
+  );
+  inlineStyles['background-image'] = converted;
 }
 
 function mapBoxShadow(
