@@ -904,9 +904,14 @@ function mapGridTemplate(
     classes.push(`${prefix}-${repeatMatch[1]}`);
     return;
   }
-  const frParts = value.trim().split(/\s+/);
-  if (frParts.every((p) => p === '1fr')) {
-    classes.push(`${prefix}-${frParts.length}`);
+  const parts = value.trim().split(/\s+/);
+  if (parts.every((p) => p === '1fr')) {
+    classes.push(`${prefix}-${parts.length}`);
+    return;
+  }
+  // 全パーツが同じ値（例: "167px 167px"）→ 均等分割と見なす
+  if (parts.length > 1 && parts.every((p) => p === parts[0])) {
+    classes.push(`${prefix}-${parts.length}`);
     return;
   }
   classes.push(`${prefix}-[${value.replace(/\s+/g, '_')}]`);
