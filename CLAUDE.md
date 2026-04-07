@@ -12,6 +12,7 @@ reversewind/
     content/             # Content Script（DOM解析・変換パイプライン）
     shared/              # 共有型定義・定数
   dist/                  # ビルド出力（gitignore対象）
+  preview/               # コンポーネントプレビュー用（gitignore対象）
   tests/                 # テスト
   docs/                  # 仕様書
 ```
@@ -36,7 +37,19 @@ npm run format       # Prettier実行
 npm run format:check # Prettierチェック
 npm run test         # Vitestテスト実行
 npm run typecheck    # TypeScript型チェック
+npm run preview      # プレビューサーバー起動（localhost:3333）
 ```
+
+## コンポーネントプレビュー
+
+コピーしたHTML+Tailwindコードの見た目を確認するためのプレビュー環境。
+
+1. `preview/index.html` の `<body>` 内にコピーしたHTMLを貼り付ける
+2. `npm run preview` でローカルサーバーを起動（http://localhost:3333）
+3. ブラウザで確認
+
+- `preview/` ディレクトリは `.gitignore` 対象のため、自由に編集可能
+- Tailwind CSS CDN を読み込み済みなので、Tailwindクラスがそのまま動作する
 
 ## コーディング規約
 
