@@ -821,6 +821,14 @@ function mapColor(
   }
 }
 
+function pushBorderWidth(width: number, prefix: string, classes: string[]) {
+  if (width === 1) classes.push(prefix);
+  else if (width === 2) classes.push(`${prefix}-2`);
+  else if (width === 4) classes.push(`${prefix}-4`);
+  else if (width === 8) classes.push(`${prefix}-8`);
+  else classes.push(`${prefix}-[${width}px]`);
+}
+
 function mapBorder(styles: NormalizedStyles, classes: string[]) {
   const borders = [
     styles.borderTop,
@@ -834,22 +842,35 @@ function mapBorder(styles: NormalizedStyles, classes: string[]) {
     return match ? parseFloat(match[1]) : 0;
   });
 
-  const allSame = widths.every((w) => w === widths[0]);
-  if (allSame && widths[0] > 0) {
-    if (widths[0] === 1) classes.push('border');
-    else if (widths[0] === 2) classes.push('border-2');
-    else if (widths[0] === 4) classes.push('border-4');
-    else if (widths[0] === 8) classes.push('border-8');
-    else classes.push(`border-[${widths[0]}px]`);
+  const [top, right, bottom, left] = widths;
+  const allSame = widths.every((w) => w === top);
 
-    // Border color (from shorthand — "1px solid <color>" の色部分を抽出)
-    if (!styles.borderColor) {
-      const colorPart = borders[0]?.replace(/^[\d.]+px\s+\w+\s+/, '').trim();
-      if (colorPart) {
-        const hex = rgbToHex(colorPart);
-        if (hex !== '#000000' && hex !== 'transparent' && hex !== colorPart) {
-          classes.push(`border-[${hex}]`);
-        }
+  if (allSame && top > 0) {
+    // 4辺すべて同じ
+    pushBorderWidth(top, 'border', classes);
+  } else if (!allSame) {
+    // 片側・2辺ボーダー
+    const sides: [number, string][] = [
+      [top, 'border-t'],
+      [right, 'border-r'],
+      [bottom, 'border-b'],
+      [left, 'border-l'],
+    ];
+    for (const [w, prefix] of sides) {
+      if (w > 0) pushBorderWidth(w, prefix, classes);
+    }
+  }
+
+  // Border color
+  const hasBorder = widths.some((w) => w > 0);
+  if (hasBorder && !styles.borderColor) {
+    // 幅 > 0 の最初の辺からcolor抽出
+    const borderWithWidth = borders[widths.findIndex((w) => w > 0)];
+    const colorPart = borderWithWidth?.replace(/^[\d.]+px\s+\w+\s+/, '').trim();
+    if (colorPart) {
+      const hex = rgbToHex(colorPart);
+      if (hex !== '#000000' && hex !== 'transparent' && hex !== colorPart) {
+        classes.push(`border-[${hex}]`);
       }
     }
   }

@@ -676,6 +676,48 @@ describe('mapStylesToTailwind', () => {
     expect(output.classList).toContain('focus-within:bg-[#f0f0f0]');
   });
 
+  // ─── individual border side tests ───
+
+  it('outputs border-t for top-only border', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({
+        borderTop: '1px solid rgb(0, 0, 0)',
+        borderRight: '0px solid rgb(0, 0, 0)',
+        borderBottom: '0px solid rgb(0, 0, 0)',
+        borderLeft: '0px solid rgb(0, 0, 0)',
+      }),
+    );
+    expect(classes).toContain('border-t');
+    expect(classes).not.toContain('border');
+    expect(classes).not.toContain('border-r');
+  });
+
+  it('outputs border-b-2 for bottom-only 2px border', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({
+        borderTop: '0px solid rgb(0, 0, 0)',
+        borderRight: '0px solid rgb(0, 0, 0)',
+        borderBottom: '2px solid rgb(0, 0, 0)',
+        borderLeft: '0px solid rgb(0, 0, 0)',
+      }),
+    );
+    expect(classes).toContain('border-b-2');
+    expect(classes).not.toContain('border');
+  });
+
+  it('outputs border color for single-side border', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({
+        borderTop: '1px solid rgb(200, 200, 200)',
+        borderRight: '0px solid rgb(0, 0, 0)',
+        borderBottom: '0px solid rgb(0, 0, 0)',
+        borderLeft: '0px solid rgb(0, 0, 0)',
+      }),
+    );
+    expect(classes).toContain('border-t');
+    expect(classes).toContain('border-[#c8c8c8]');
+  });
+
   // ─── borderColor tests ───
 
   it('outputs border color from borderColor field', () => {
