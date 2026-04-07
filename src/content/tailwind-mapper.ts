@@ -259,7 +259,33 @@ function spacingClass(px: number): string {
 }
 
 /**
- * rgb/rgba文字列をhexに変換
+ * Canvas getImageDataを使って任意のCSS色文字列を "#rrggbb" または "rgba(r,g,b,a)" に正規化する。
+ * oklch/oklab等の新しい色形式にも対応。ブラウザ環境でのみ動作し、非ブラウザ環境では元の文字列を返す。
+ */
+export function normalizeColor(color: string): string {
+  try {
+    const canvas = document.createElement('canvas');
+    canvas.width = 1;
+    canvas.height = 1;
+    const ctx = canvas.getContext('2d', { colorSpace: 'srgb' });
+    if (!ctx) return color;
+    ctx.clearRect(0, 0, 1, 1);
+    ctx.fillStyle = color;
+    ctx.fillRect(0, 0, 1, 1);
+    const [r, g, b, a] = ctx.getImageData(0, 0, 1, 1).data;
+    if (a === 0) return 'transparent';
+    if (a < 255) {
+      const alpha = Math.round((a / 255) * 100) / 100;
+      return `rgba(${r},${g},${b},${alpha})`;
+    }
+    return `#${((1 << 24) | (r << 16) | (g << 8) | b).toString(16).slice(1)}`;
+  } catch {
+    return color;
+  }
+}
+
+/**
+ * CSS色文字列をhexに変換。rgb/rgbaは直接パース、oklch/oklab等はCanvas API経由で正規化。
  */
 export function rgbToHex(color: string): string {
   if (
@@ -269,7 +295,16 @@ export function rgbToHex(color: string): string {
   )
     return 'transparent';
 
-  const rgbaMatch = color.match(
+  // oklch/oklab等の非rgb色をCanvas APIでrgb/hexに正規化
+  let target = color;
+  if (!color.match(/^rgba?\(/)) {
+    target = normalizeColor(color);
+  }
+
+  // Canvas APIが "#rrggbb" を直接返した場合
+  if (target.startsWith('#')) return target;
+
+  const rgbaMatch = target.match(
     /rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*([\d.]+))?\s*\)/,
   );
   if (!rgbaMatch) return color;
@@ -807,14 +842,12 @@ function mapBorder(styles: NormalizedStyles, classes: string[]) {
     else if (widths[0] === 8) classes.push('border-8');
     else classes.push(`border-[${widths[0]}px]`);
 
-    // Border color (from shorthand)
+    // Border color (from shorthand — "1px solid <color>" の色部分を抽出)
     if (!styles.borderColor) {
-      const colorMatch = borders[0]?.match(
-        /rgba?\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*(?:,\s*[\d.]+)?\s*\)/,
-      );
-      if (colorMatch) {
-        const hex = rgbToHex(colorMatch[0]);
-        if (hex !== '#000000') {
+      const colorPart = borders[0]?.replace(/^[\d.]+px\s+\w+\s+/, '').trim();
+      if (colorPart) {
+        const hex = rgbToHex(colorPart);
+        if (hex !== '#000000' && hex !== 'transparent' && hex !== colorPart) {
           classes.push(`border-[${hex}]`);
         }
       }

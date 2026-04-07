@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   parsePx,
   rgbToHex,
+  normalizeColor,
   mapStylesToTailwind,
   convertToOutput,
 } from '../src/content/tailwind-mapper';
@@ -36,6 +37,29 @@ describe('rgbToHex', () => {
 
   it('handles rgba with alpha', () => {
     expect(rgbToHex('rgba(255, 255, 255, 0.7)')).toBe('rgba(255,255,255,0.7)');
+  });
+
+  it('returns original string for non-rgb colors in non-browser env', () => {
+    // Canvas APIが使えないNode.js環境では元の文字列がそのまま返る
+    expect(rgbToHex('oklch(0.982 0.018 155.826)')).toBe(
+      'oklch(0.982 0.018 155.826)',
+    );
+    expect(rgbToHex('oklab(0.5 0.1 -0.1)')).toBe('oklab(0.5 0.1 -0.1)');
+  });
+
+  it('handles hex strings returned by Canvas API (via normalizeColor)', () => {
+    // Canvas APIが "#rrggbb" を返した場合のパスを直接テスト
+    expect(rgbToHex('#f0fdf4')).toBe('#f0fdf4');
+    expect(rgbToHex('#bbf7d0')).toBe('#bbf7d0');
+  });
+});
+
+describe('normalizeColor', () => {
+  it('returns original string in non-browser environment', () => {
+    // Node.js環境ではdocumentが存在しないため元の文字列を返す
+    expect(normalizeColor('oklch(0.982 0.018 155.826)')).toBe(
+      'oklch(0.982 0.018 155.826)',
+    );
   });
 });
 
