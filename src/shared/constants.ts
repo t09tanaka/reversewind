@@ -1,14 +1,8 @@
-/** コンテキストメニューID（コンポーネント） */
-export const MENU_ID_COMPONENT = 'reversewind-copy-component';
+/** コンテキストメニューID */
+export const MENU_ID = 'reversewind-copy-as-tailwind';
 
-/** メニュー表示テキスト（コンポーネント） */
-export const MENU_TITLE_COMPONENT = 'Reversewind: Copy component';
-
-/** コンテキストメニューID（ページ） */
-export const MENU_ID_PAGE = 'reversewind-copy-page';
-
-/** メニュー表示テキスト（ページ） */
-export const MENU_TITLE_PAGE = 'Reversewind: Copy page';
+/** メニュー表示テキスト */
+export const MENU_TITLE = 'Reversewind: Copy';
 
 /** ページ全体の要素数上限 */
 export const MAX_PAGE_ELEMENTS = 3000;

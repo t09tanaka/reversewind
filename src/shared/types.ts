@@ -107,7 +107,7 @@ export type OutputNode = {
 
 /** メッセージ型 */
 export type ReversewindMessage = {
-  type: 'REVERSEWIND_CONVERT' | 'REVERSEWIND_CONVERT_PAGE';
+  type: 'REVERSEWIND_CONVERT';
 };
 
 export type ReversewindResponse = {

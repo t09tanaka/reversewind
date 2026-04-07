@@ -63,114 +63,117 @@ function countElements(node: ExtractedNode): number {
   return count;
 }
 
+/**
+ * ページ全体をコピーする
+ */
+function copyPage(sendResponse: (response: unknown) => void): true {
+  const bodyCs = getComputedStyle(document.body);
+  const baseClasses = extractBaseStyles({
+    backgroundColor: bodyCs.backgroundColor,
+    color: bodyCs.color,
+    fontFamily: bodyCs.fontFamily,
+  });
+
+  const visibleChildren = getVisibleBodyChildren();
+
+  let totalElements = 0;
+  const extractedChildren: ExtractedNode[] = [];
+  for (const child of visibleChildren) {
+    const extracted = extractSubtree(child, MAX_PAGE_ELEMENTS - totalElements);
+    extractedChildren.push(extracted);
+    totalElements += countElements(extracted);
+    if (totalElements > MAX_PAGE_ELEMENTS) {
+      showToast(TOAST_MESSAGES.PAGE_TOO_LARGE, 'error');
+      sendResponse({ success: false, error: 'page too large' });
+      return true;
+    }
+  }
+
+  const childrenHtml = extractedChildren
+    .map((ext) => {
+      const output = convertToOutput(ext);
+      return generateHtml(output, 1);
+    })
+    .join('\n');
+
+  const classAttr =
+    baseClasses.length > 0 ? ` class="${baseClasses.join(' ')}"` : '';
+  const html = `<!-- Reversewind: base styles from html/body -->\n<div${classAttr}>\n${childrenHtml}\n</div>`;
+
+  copyToClipboard(html)
+    .then(() => {
+      showToast(TOAST_MESSAGES.SUCCESS_PAGE, 'success');
+      sendResponse({ success: true });
+    })
+    .catch((err) => {
+      console.error('[Reversewind] copy failed:', err);
+      showToast(TOAST_MESSAGES.COPY_FAILED, 'error');
+      sendResponse({ success: false, error: 'copy failed' });
+    });
+
+  return true;
+}
+
+/**
+ * コンポーネントをコピーする
+ */
+function copyComponent(
+  element: Element,
+  sendResponse: (response: unknown) => void,
+): true {
+  const extracted = extractSubtree(element, MAX_ELEMENTS);
+  const output = convertToOutput(extracted);
+  const html = generateHtml(output);
+
+  copyToClipboard(html)
+    .then(() => {
+      showToast(TOAST_MESSAGES.SUCCESS, 'success');
+
+      // コピー成功時にハイライト表示
+      const removeHighlight = highlightElement(element);
+      setTimeout(removeHighlight, TOAST_DURATION);
+
+      sendResponse({ success: true });
+    })
+    .catch((err) => {
+      console.error('[Reversewind] copy failed:', err);
+      showToast(TOAST_MESSAGES.COPY_FAILED, 'error');
+      sendResponse({ success: false, error: 'copy failed' });
+    });
+
+  return true;
+}
+
 // Service Workerからのメッセージを受信
 chrome.runtime.onMessage.addListener(
   (message: ReversewindMessage, _sender, sendResponse) => {
-    if (message.type === 'REVERSEWIND_CONVERT') {
-      try {
-        const element = selectionStore.get();
-        if (!element) {
-          showToast(TOAST_MESSAGES.TARGET_NOT_FOUND, 'error');
-          sendResponse({ success: false, error: 'target not found' });
-          return;
-        }
+    if (message.type !== 'REVERSEWIND_CONVERT') return;
 
-        const extracted = extractSubtree(element, MAX_ELEMENTS);
-        const output = convertToOutput(extracted);
-        const html = generateHtml(output);
-
-        copyToClipboard(html)
-          .then(() => {
-            showToast(TOAST_MESSAGES.SUCCESS, 'success');
-
-            // コピー成功時にハイライト表示
-            const removeHighlight = highlightElement(element);
-            setTimeout(removeHighlight, TOAST_DURATION);
-
-            sendResponse({ success: true });
-          })
-          .catch((err) => {
-            console.error('[Reversewind] copy failed:', err);
-            showToast(TOAST_MESSAGES.COPY_FAILED, 'error');
-            sendResponse({ success: false, error: 'copy failed' });
-          });
-
-        // 非同期レスポンスのためtrueを返す
-        return true;
-      } catch (err) {
-        const message = err instanceof Error ? err.message : 'unknown error';
-        console.error('[Reversewind] error:', message);
-
-        if (message.includes('too large')) {
-          showToast(TOAST_MESSAGES.SUBTREE_TOO_LARGE, 'error');
-        } else {
-          showToast(TOAST_MESSAGES.COPY_FAILED, 'error');
-        }
-
-        sendResponse({ success: false, error: message });
+    try {
+      const element = selectionStore.get();
+      if (!element) {
+        showToast(TOAST_MESSAGES.TARGET_NOT_FOUND, 'error');
+        sendResponse({ success: false, error: 'target not found' });
+        return;
       }
-    }
 
-    if (message.type === 'REVERSEWIND_CONVERT_PAGE') {
-      try {
-        const bodyCs = getComputedStyle(document.body);
-        const baseClasses = extractBaseStyles({
-          backgroundColor: bodyCs.backgroundColor,
-          color: bodyCs.color,
-          fontFamily: bodyCs.fontFamily,
-        });
-
-        const visibleChildren = getVisibleBodyChildren();
-
-        let totalElements = 0;
-        const extractedChildren: ExtractedNode[] = [];
-        for (const child of visibleChildren) {
-          const extracted = extractSubtree(
-            child,
-            MAX_PAGE_ELEMENTS - totalElements,
-          );
-          extractedChildren.push(extracted);
-          totalElements += countElements(extracted);
-          if (totalElements > MAX_PAGE_ELEMENTS) {
-            showToast(TOAST_MESSAGES.PAGE_TOO_LARGE, 'error');
-            sendResponse({ success: false, error: 'page too large' });
-            return;
-          }
-        }
-
-        const childrenHtml = extractedChildren
-          .map((ext) => {
-            const output = convertToOutput(ext);
-            return generateHtml(output, 1);
-          })
-          .join('\n');
-
-        const classAttr =
-          baseClasses.length > 0 ? ` class="${baseClasses.join(' ')}"` : '';
-        const html = `<!-- Reversewind: base styles from html/body -->\n<div${classAttr}>\n${childrenHtml}\n</div>`;
-
-        copyToClipboard(html)
-          .then(() => {
-            showToast(TOAST_MESSAGES.SUCCESS_PAGE, 'success');
-            sendResponse({ success: true });
-          })
-          .catch((err) => {
-            console.error('[Reversewind] copy failed:', err);
-            showToast(TOAST_MESSAGES.COPY_FAILED, 'error');
-            sendResponse({ success: false, error: 'copy failed' });
-          });
-
-        return true;
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : 'unknown error';
-        console.error('[Reversewind] page copy error:', msg);
-        if (msg.includes('too large')) {
-          showToast(TOAST_MESSAGES.PAGE_TOO_LARGE, 'error');
-        } else {
-          showToast(TOAST_MESSAGES.COPY_FAILED, 'error');
-        }
-        sendResponse({ success: false, error: msg });
+      // bodyが選択された場合はページ全体コピー、それ以外はコンポーネントコピー
+      if (element === document.body) {
+        return copyPage(sendResponse);
       }
+
+      return copyComponent(element, sendResponse);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'unknown error';
+      console.error('[Reversewind] error:', msg);
+
+      if (msg.includes('too large')) {
+        showToast(TOAST_MESSAGES.SUBTREE_TOO_LARGE, 'error');
+      } else {
+        showToast(TOAST_MESSAGES.COPY_FAILED, 'error');
+      }
+
+      sendResponse({ success: false, error: msg });
     }
   },
 );

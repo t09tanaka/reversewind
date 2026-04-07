@@ -1,10 +1,7 @@
-import {
-  MENU_ID_COMPONENT,
-  MENU_TITLE_COMPONENT,
-  MENU_ID_PAGE,
-  MENU_TITLE_PAGE,
-} from '../shared/constants';
+import { MENU_ID, MENU_TITLE } from '../shared/constants';
 
+// content script を動的に登録（manifest の content_scripts を使わない）
+// host_permissions により全ページで自動注入される
 chrome.scripting
   .registerContentScripts([
     {
@@ -15,6 +12,7 @@ chrome.scripting
     },
   ])
   .catch((err: unknown) => {
+    // 既に登録済み（Duplicate script ID）の場合は正常
     if (err instanceof Error && err.message.includes('Duplicate script ID')) {
       return;
     }
@@ -23,23 +21,14 @@ chrome.scripting
 
 chrome.runtime.onInstalled.addListener(() => {
   chrome.contextMenus.create({
-    id: MENU_ID_COMPONENT,
-    title: MENU_TITLE_COMPONENT,
-    contexts: ['all'],
-  });
-  chrome.contextMenus.create({
-    id: MENU_ID_PAGE,
-    title: MENU_TITLE_PAGE,
+    id: MENU_ID,
+    title: MENU_TITLE,
     contexts: ['all'],
   });
 });
 
 chrome.contextMenus.onClicked.addListener((info, tab) => {
-  if (!tab?.id) return;
+  if (info.menuItemId !== MENU_ID || !tab?.id) return;
 
-  if (info.menuItemId === MENU_ID_COMPONENT) {
-    chrome.tabs.sendMessage(tab.id, { type: 'REVERSEWIND_CONVERT' });
-  } else if (info.menuItemId === MENU_ID_PAGE) {
-    chrome.tabs.sendMessage(tab.id, { type: 'REVERSEWIND_CONVERT_PAGE' });
-  }
+  chrome.tabs.sendMessage(tab.id, { type: 'REVERSEWIND_CONVERT' });
 });
