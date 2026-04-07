@@ -1,8 +1,17 @@
-/** コンテキストメニューID */
-export const MENU_ID = 'reversewind-copy-as-tailwind';
+/** コンテキストメニューID（コンポーネント） */
+export const MENU_ID_COMPONENT = 'reversewind-copy-component';
 
-/** メニュー表示テキスト */
-export const MENU_TITLE = 'Reversewind: Copy';
+/** メニュー表示テキスト（コンポーネント） */
+export const MENU_TITLE_COMPONENT = 'Reversewind: Copy component';
+
+/** コンテキストメニューID（ページ） */
+export const MENU_ID_PAGE = 'reversewind-copy-page';
+
+/** メニュー表示テキスト（ページ） */
+export const MENU_TITLE_PAGE = 'Reversewind: Copy page';
+
+/** ページ全体の要素数上限 */
+export const MAX_PAGE_ELEMENTS = 3000;
 
 /** サブツリー要素数の上限 */
 export const MAX_ELEMENTS = 300;
@@ -93,7 +102,9 @@ export const TOAST_DURATION = 3000;
 /** トーストメッセージ */
 export const TOAST_MESSAGES = {
   SUCCESS: 'Reversewind: copied as Tailwind',
+  SUCCESS_PAGE: 'Reversewind: page copied as Tailwind',
   TARGET_NOT_FOUND: 'Reversewind: target not found',
   COPY_FAILED: 'Reversewind: copy failed',
   SUBTREE_TOO_LARGE: 'Reversewind: subtree too large',
+  PAGE_TOO_LARGE: 'Reversewind: page too large',
 } as const;
