@@ -718,6 +718,107 @@ describe('mapStylesToTailwind', () => {
     expect(classes).toContain('border-[#c8c8c8]');
   });
 
+  it('outputs per-side border colors when sides differ', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({
+        borderTop: '1px solid rgb(200, 200, 200)',
+        borderRight: '1px solid rgb(200, 200, 200)',
+        borderBottom: '1px solid rgb(200, 200, 200)',
+        borderLeft: '4px solid rgb(34, 197, 94)',
+      }),
+    );
+    expect(classes).toContain('border-t');
+    expect(classes).toContain('border-r');
+    expect(classes).toContain('border-b');
+    expect(classes).toContain('border-l-4');
+    // 最頻色がベース、異なる辺が個別指定
+    expect(classes).toContain('border-[#c8c8c8]');
+    expect(classes).toContain('border-l-[#22c55e]');
+  });
+
+  // ─── grid template tests ───
+
+  it('converts equal-width columns to grid-cols-N', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({
+        display: 'grid',
+        gridTemplateColumns: '167px 167px',
+      }),
+    );
+    expect(classes).toContain('grid-cols-2');
+  });
+
+  it('converts 3 equal-width columns to grid-cols-3', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({
+        display: 'grid',
+        gridTemplateColumns: '100px 100px 100px',
+      }),
+    );
+    expect(classes).toContain('grid-cols-3');
+  });
+
+  it('converts 4 equal-width columns to grid-cols-4', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({
+        display: 'grid',
+        gridTemplateColumns: '250px 250px 250px 250px',
+      }),
+    );
+    expect(classes).toContain('grid-cols-4');
+  });
+
+  it('keeps arbitrary value for unequal columns', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({
+        display: 'grid',
+        gridTemplateColumns: '100px 200px',
+      }),
+    );
+    expect(classes).toContain('grid-cols-[100px_200px]');
+  });
+
+  it('converts 1fr 1fr to grid-cols-2', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({
+        display: 'grid',
+        gridTemplateColumns: '1fr 1fr',
+      }),
+    );
+    expect(classes).toContain('grid-cols-2');
+  });
+
+  it('converts repeat format to grid-cols-N', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({
+        display: 'grid',
+        gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+      }),
+    );
+    expect(classes).toContain('grid-cols-3');
+  });
+
+  it('converts equal-height rows to grid-rows-N', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({
+        display: 'grid',
+        gridTemplateColumns: '1fr 1fr',
+        gridTemplateRows: '48px 48px',
+      }),
+    );
+    expect(classes).toContain('grid-rows-2');
+  });
+
+  it('skips grid-template when value is none', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({
+        display: 'grid',
+        gridTemplateColumns: 'none',
+      }),
+    );
+    expect(classes).not.toContain('grid-cols-none');
+  });
+
   // ─── borderColor tests ───
 
   it('outputs border color from borderColor field', () => {

@@ -861,16 +861,40 @@ function mapBorder(styles: NormalizedStyles, classes: string[]) {
     }
   }
 
-  // Border color
+  // Border color（辺ごとに異なる色に対応）
   const hasBorder = widths.some((w) => w > 0);
   if (hasBorder && !styles.borderColor) {
-    // 幅 > 0 の最初の辺からcolor抽出
-    const borderWithWidth = borders[widths.findIndex((w) => w > 0)];
-    const colorPart = borderWithWidth?.replace(/^[\d.]+px\s+\w+\s+/, '').trim();
-    if (colorPart) {
+    const sideNames = ['border-t', 'border-r', 'border-b', 'border-l'];
+    const colors = borders.map((b, i) => {
+      if (widths[i] === 0 || !b) return null;
+      const colorPart = b.replace(/^[\d.]+px\s+\w+\s+/, '').trim();
+      if (!colorPart) return null;
       const hex = rgbToHex(colorPart);
-      if (hex !== '#000000' && hex !== 'transparent' && hex !== colorPart) {
-        classes.push(`border-[${hex}]`);
+      if (hex === '#000000' || hex === 'transparent' || hex === colorPart)
+        return null;
+      return hex;
+    });
+
+    const validColors = colors.filter((c): c is string => c !== null);
+    const uniqueColors = [...new Set(validColors)];
+
+    if (uniqueColors.length === 1) {
+      // 全辺同じ色
+      classes.push(`border-[${uniqueColors[0]}]`);
+    } else if (uniqueColors.length > 1) {
+      // 最頻色をベースに、異なる辺を個別指定
+      const colorCounts = new Map<string, number>();
+      for (const c of validColors) {
+        colorCounts.set(c, (colorCounts.get(c) ?? 0) + 1);
+      }
+      const baseColor = [...colorCounts.entries()].sort(
+        (a, b) => b[1] - a[1],
+      )[0][0];
+      classes.push(`border-[${baseColor}]`);
+      for (let i = 0; i < 4; i++) {
+        if (colors[i] && colors[i] !== baseColor) {
+          classes.push(`${sideNames[i]}-[${colors[i]}]`);
+        }
       }
     }
   }
