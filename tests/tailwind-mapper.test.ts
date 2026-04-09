@@ -536,6 +536,7 @@ describe('mapStylesToTailwind', () => {
   // ─── SVG skip tests ───
 
   it('returns empty classes for svg elements', () => {
+    // SVG は独自の属性システムで完結するため mapper は class を生成しない
     const { classes } = mapStylesToTailwind(
       makeStyles({
         display: 'inline',

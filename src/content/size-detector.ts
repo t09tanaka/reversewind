@@ -42,6 +42,13 @@ const REPLACED_ELEMENTS = new Set([
 ]);
 
 /**
+ * HTMLElement または SVGElement なら .style があるので型を絞り込む
+ */
+function hasInlineStyle(element: Element): element is HTMLElement | SVGElement {
+  return element instanceof HTMLElement || element instanceof SVGElement;
+}
+
+/**
  * CSSルール群から要素にマッチするサイズ指定を検索する
  */
 function hasAuthoredProperty(
@@ -49,8 +56,8 @@ function hasAuthoredProperty(
   rules: CSSStyleRule[],
   properties: string[],
 ): boolean {
-  // 1. inline style チェック
-  if (element instanceof HTMLElement && element.style) {
+  // 1. inline style チェック（HTMLElement / SVGElement 両対応）
+  if (hasInlineStyle(element)) {
     for (const prop of properties) {
       const value = element.style.getPropertyValue(prop);
       if (value && value !== 'auto' && value !== 'none') {
@@ -59,14 +66,12 @@ function hasAuthoredProperty(
     }
   }
 
-  // 2. HTML属性 (img width/height 等)
-  if (element instanceof HTMLElement) {
-    if (properties.includes('width') && element.hasAttribute('width')) {
-      return true;
-    }
-    if (properties.includes('height') && element.hasAttribute('height')) {
-      return true;
-    }
+  // 2. HTML / SVG 属性 (img width/height, svg width/height 等)
+  if (properties.includes('width') && element.hasAttribute('width')) {
+    return true;
+  }
+  if (properties.includes('height') && element.hasAttribute('height')) {
+    return true;
   }
 
   // 3. CSSルール走査
@@ -137,7 +142,7 @@ function heuristicDetect(element: Element, cs: CSSStyleDeclaration): SizeInfo {
   let heightAuthored = false;
 
   // inline style があれば authored
-  if (element instanceof HTMLElement && element.style) {
+  if (hasInlineStyle(element)) {
     if (element.style.width && element.style.width !== 'auto') {
       widthAuthored = true;
     }

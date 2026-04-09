@@ -251,9 +251,10 @@ export function extractStyles(element: Element): NormalizedStyles {
     }
   }
 
-  // img/video 等の置換要素は HTML width/height 属性経由で author がサイズ指定
-  // できる。これを authored マップに取り込む（CSSOM からは見えないため）。
-  if (element instanceof HTMLElement) {
+  // img/video/svg 等は width/height 属性経由で author がサイズ指定できる。
+  // HTMLElement / SVGElement の両方でサポート。CSSOM からは見えない値なので
+  // ここで authored マップに取り込む。
+  if (element instanceof HTMLElement || element instanceof SVGElement) {
     const widthAttr = element.getAttribute('width');
     if (widthAttr && !authored.has('width')) {
       authored.set('width', widthAttr);

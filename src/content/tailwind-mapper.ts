@@ -647,7 +647,9 @@ export function mapStylesToTailwind(
   const classes: string[] = [];
   const inlineStyles: Record<string, string> = {};
 
-  // SVG内部要素はTailwind変換をスキップ
+  // SVG要素はTailwind変換をスキップ。SVGは fill/stroke/stroke-width 等の
+  // 独自属性で完結しており、currentColor の意味を保持するためにも class 生成は
+  // しない方が安全（Phase 2 B+ を revert）。
   if (tagName && SVG_ELEMENTS.has(tagName)) {
     return { classes, inlineStyles };
   }

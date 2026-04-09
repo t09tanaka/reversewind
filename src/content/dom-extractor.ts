@@ -44,13 +44,16 @@ function extractHtmlAttributes(element: Element): Record<string, string> {
 }
 
 /**
- * SVG要素から属性を抽出する（イベント属性とstyleのみ除去、classは保持）
+ * SVG要素から属性を抽出する。
+ * - イベント属性のみ削除
+ * - class / id / style は全て保持（SVG は独自の属性システムで完結しており、
+ *   mapper でも変換しないため元の属性をそのまま残す。clipPath/mask/filter/
+ *   linearGradient の参照や inline-styled SVG child の fidelity を保つ）
  */
 function extractSvgAttributes(element: Element): Record<string, string> {
   const attrs: Record<string, string> = {};
   for (const attr of element.attributes) {
     if (isEventAttribute(attr.name)) continue;
-    if (attr.name === 'style' || attr.name === 'id') continue;
     attrs[attr.name] = attr.value;
   }
   return attrs;
