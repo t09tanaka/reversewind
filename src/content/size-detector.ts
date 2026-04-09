@@ -5,6 +5,8 @@
 
 import type { SizeInfo } from '../shared/types';
 
+import { collectCSSRules } from './css-rule-collector';
+
 /** サイズ制約に関連するCSSプロパティ */
 const SIZE_PROPERTIES_WIDTH = [
   'width',
@@ -38,42 +40,6 @@ const REPLACED_ELEMENTS = new Set([
   'textarea',
   'select',
 ]);
-
-/**
- * document.styleSheets からCSSルールを安全に読み取る。
- * クロスオリジンのスタイルシートは SecurityError を投げるのでスキップする。
- */
-function collectCSSRules(): CSSStyleRule[] {
-  const rules: CSSStyleRule[] = [];
-  for (const sheet of document.styleSheets) {
-    let cssRules: CSSRuleList;
-    try {
-      cssRules = sheet.cssRules;
-    } catch {
-      // クロスオリジンのスタイルシートはスキップ
-      continue;
-    }
-    collectRulesFromList(cssRules, rules);
-  }
-  return rules;
-}
-
-function collectRulesFromList(
-  ruleList: CSSRuleList,
-  out: CSSStyleRule[],
-): void {
-  for (const rule of ruleList) {
-    if (rule instanceof CSSStyleRule) {
-      out.push(rule);
-    } else if (
-      'cssRules' in rule &&
-      (rule as CSSGroupingRule).cssRules.length > 0
-    ) {
-      // CSSMediaRule, CSSSupportsRule, CSSLayerBlockRule 等のネストルールを再帰走査
-      collectRulesFromList((rule as CSSGroupingRule).cssRules, out);
-    }
-  }
-}
 
 /**
  * CSSルール群から要素にマッチするサイズ指定を検索する
