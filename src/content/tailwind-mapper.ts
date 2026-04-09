@@ -592,17 +592,23 @@ export function mapStylesToTailwind(
     if (cls) classes.push(cls);
   }
 
-  // Line height — ページ全体で設定されることが多いため出力しない
-  // leading-none のみ例外的に出力（意図的な指定の可能性が高い）
+  // Line height — 継承チェック
   if (
     styles.lineHeight &&
     styles.lineHeight !== 'normal' &&
     !isInherited('lineHeight', styles, parentStyles)
   ) {
-    const lhPx = parsePx(styles.lineHeight);
-    const fsPx = parsePx(styles.fontSize);
-    if (lhPx !== null && fsPx !== null && lhPx === fsPx) {
-      classes.push('leading-none');
+    mapLineHeight(styles.lineHeight, styles.fontSize, classes);
+  }
+
+  // Font style (italic)
+  if (
+    styles.fontStyle &&
+    styles.fontStyle !== 'normal' &&
+    !isInherited('fontStyle', styles, parentStyles)
+  ) {
+    if (styles.fontStyle === 'italic' || styles.fontStyle === 'oblique') {
+      classes.push('italic');
     }
   }
 
@@ -1136,6 +1142,56 @@ function mapGridTemplate(
     return;
   }
   classes.push(`${prefix}-[${value.replace(/\s+/g, '_')}]`);
+}
+
+/**
+ * line-height の computed / authored 値を Tailwind leading-* utility にマップする。
+ *
+ * 方針: 「author が明示的に意図した line-height」だけ出力する。
+ * - unitless 数値（1.1, 1.5 等）は author が書いた値なので常に出力
+ * - px 値は「font-size と等しい」または「既知比率に一致する」場合のみ出力
+ * - それ以外の px 値（親から継承された body デフォルト等）は出力しない
+ */
+function mapLineHeight(
+  value: string,
+  fontSize: string | undefined,
+  classes: string[],
+) {
+  const KNOWN_RATIOS: Record<string, string> = {
+    '1': 'leading-none',
+    '1.25': 'leading-tight',
+    '1.375': 'leading-snug',
+    '1.5': 'leading-normal',
+    '1.625': 'leading-relaxed',
+    '2': 'leading-loose',
+  };
+
+  // 単位なし数値（unitless line-height）→ author 明示と判断し常に出力
+  const unitless = value.match(/^[\d.]+$/);
+  if (unitless) {
+    const key = parseFloat(value).toString();
+    if (key in KNOWN_RATIOS) {
+      classes.push(KNOWN_RATIOS[key]);
+    } else {
+      classes.push(`leading-[${value}]`);
+    }
+    return;
+  }
+
+  // px 値: font-size との比率で既知値にマッチする場合のみ出力。
+  // （マッチしない px 値は body からの継承等のノイズ扱いでスキップ）
+  const lhPx = parsePx(value);
+  const fsPx = parsePx(fontSize);
+  if (lhPx !== null && fsPx !== null) {
+    const ratio = lhPx / fsPx;
+    for (const [r, cls] of Object.entries(KNOWN_RATIOS)) {
+      if (Math.abs(ratio - parseFloat(r)) < 0.01) {
+        classes.push(cls);
+        return;
+      }
+    }
+  }
+  // マッチしない px 値は出力しない
 }
 
 /**

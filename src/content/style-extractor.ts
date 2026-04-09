@@ -43,6 +43,8 @@ const AUTHORED_OFFSET_AND_MARGIN_PROPS = [
   'min-block-size',
   'max-inline-size',
   'max-block-size',
+  // unitless line-height を保持するため authored を取りたい
+  'line-height',
 ] as const;
 
 /**
@@ -52,7 +54,7 @@ const AUTHORED_OFFSET_AND_MARGIN_PROPS = [
  * 数値単位は computed の方がブラウザ解決済みで扱いやすい。
  */
 const SIZE_KEYWORD_REGEX =
-  /^(auto|none|min-content|max-content|fit-content|stretch|fill|inherit|initial|unset|revert|[\d.]+%)$/;
+  /^(auto|none|min-content|max-content|fit-content|stretch|fill|inherit|initial|unset|revert|[\d.]+%|[\d.]+(v[whib]|svh|svw|lvh|lvw|dvh|dvw|vmin|vmax))$/;
 
 function effectiveSize(
   authoredValue: string | undefined,
@@ -311,7 +313,14 @@ export function extractStyles(element: Element): NormalizedStyles {
     fontSize: cs.fontSize,
     fontWeight: cs.fontWeight,
     fontFamily: cs.fontFamily,
-    lineHeight: cs.lineHeight,
+    fontStyle: cs.fontStyle,
+    // 単位のない authored line-height（1.1 や 1.625 など）を保持するため、
+    // 可能なら authored 値を使う。数値px の場合は computed を使う。
+    lineHeight:
+      authored.get('line-height') &&
+      !/^-?[\d.]+px$/.test(authored.get('line-height')!)
+        ? authored.get('line-height')
+        : cs.lineHeight,
     letterSpacing: cs.letterSpacing,
     textAlign: cs.textAlign,
     textTransform: cs.textTransform,

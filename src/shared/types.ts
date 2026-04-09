@@ -56,6 +56,7 @@ export type NormalizedStyles = {
   fontSize?: string;
   fontWeight?: string;
   fontFamily?: string;
+  fontStyle?: string;
   lineHeight?: string;
   letterSpacing?: string;
   textAlign?: string;

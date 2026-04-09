@@ -1175,6 +1175,65 @@ describe('mapStylesToTailwind', () => {
     expect(classes).not.toContain('items-center');
   });
 
+  // ─── font-style (italic) tests ───
+
+  it('maps font-style italic to italic', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({ fontStyle: 'italic' }),
+    );
+    expect(classes).toContain('italic');
+  });
+
+  it('maps font-style oblique to italic', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({ fontStyle: 'oblique' }),
+    );
+    expect(classes).toContain('italic');
+  });
+
+  it('skips font-style normal', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({ fontStyle: 'normal' }),
+    );
+    expect(classes).not.toContain('italic');
+  });
+
+  // ─── line-height tests ───
+
+  it('maps unitless line-height 1.5 to leading-normal', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({ lineHeight: '1.5', fontSize: '16px' }),
+    );
+    expect(classes).toContain('leading-normal');
+  });
+
+  it('maps unitless line-height 1.625 to leading-relaxed', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({ lineHeight: '1.625' }),
+    );
+    expect(classes).toContain('leading-relaxed');
+  });
+
+  it('maps unitless line-height 1.1 to arbitrary leading-[1.1]', () => {
+    const { classes } = mapStylesToTailwind(makeStyles({ lineHeight: '1.1' }));
+    expect(classes).toContain('leading-[1.1]');
+  });
+
+  it('maps px line-height matching font-size to leading-none', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({ lineHeight: '72px', fontSize: '72px' }),
+    );
+    expect(classes).toContain('leading-none');
+  });
+
+  it('maps px line-height ratio matching known leading to named utility', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({ lineHeight: '26px', fontSize: '16px' }),
+    );
+    // 26 / 16 = 1.625 → leading-relaxed
+    expect(classes).toContain('leading-relaxed');
+  });
+
   // ─── borderColor tests ───
 
   it('outputs border color from borderColor field', () => {
