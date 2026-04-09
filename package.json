@@ -2,7 +2,7 @@
   "name": "reversewind",
   "version": "0.3.1",
   "private": true,
-  "description": "Copy any web element as HTML + Tailwind CSS from the right-click menu",
+  "description": "Copy any web element as agent-ready HTML + Tailwind CSS, with zero ambiguity",
   "scripts": {
     "build": "webpack --mode production",
     "dev": "webpack --mode development --watch",
