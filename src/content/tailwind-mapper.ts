@@ -50,6 +50,21 @@ const SPACING_MAP: Record<number, string> = {
   384: '96',
 };
 
+// ─── Max-width rem scale (Tailwind default) ───
+const MAX_WIDTH_REM_MAP: Record<number, string> = {
+  320: 'max-w-xs', // 20rem
+  384: 'max-w-sm', // 24rem
+  448: 'max-w-md', // 28rem
+  512: 'max-w-lg', // 32rem
+  576: 'max-w-xl', // 36rem
+  672: 'max-w-2xl', // 42rem
+  768: 'max-w-3xl', // 48rem
+  896: 'max-w-4xl', // 56rem
+  1024: 'max-w-5xl', // 64rem
+  1152: 'max-w-6xl', // 72rem
+  1280: 'max-w-7xl', // 80rem
+};
+
 // ─── Border radius ───
 const RADIUS_MAP: Record<number, string> = {
   0: 'rounded-none',
@@ -618,10 +633,7 @@ export function mapStylesToTailwind(
     styles.letterSpacing !== 'normal' &&
     !isInherited('letterSpacing', styles, parentStyles)
   ) {
-    const px = parsePx(styles.letterSpacing);
-    if (px !== null && px !== 0) {
-      classes.push(`tracking-[${px}px]`);
-    }
+    mapLetterSpacing(styles.letterSpacing, styles.fontSize, classes);
   }
 
   // Text align — 継承チェック。start/leftはデフォルト
@@ -803,6 +815,11 @@ function mapSize(value: string | undefined, prefix: string, classes: string[]) {
   if (prefix.startsWith('min-') && value === '0px') return;
   const px = parsePx(value);
   if (px === null) return;
+  // max-w は Tailwind 独自の rem スケール（max-w-xs..max-w-7xl）を優先
+  if (prefix === 'max-w' && px in MAX_WIDTH_REM_MAP) {
+    classes.push(MAX_WIDTH_REM_MAP[px]);
+    return;
+  }
   if (px in SPACING_MAP) {
     classes.push(`${prefix}-${SPACING_MAP[px]}`);
   } else {
@@ -1142,6 +1159,40 @@ function mapGridTemplate(
     return;
   }
   classes.push(`${prefix}-[${value.replace(/\s+/g, '_')}]`);
+}
+
+/**
+ * letter-spacing の computed 値を Tailwind tracking-* utility にマップする。
+ * letter-spacing の既知比率（em ベース）に近ければ名前付き utility を使い、
+ * そうでなければ px 任意値で出力する。
+ */
+function mapLetterSpacing(
+  value: string,
+  fontSize: string | undefined,
+  classes: string[],
+): void {
+  const px = parsePx(value);
+  if (px === null || px === 0) return;
+  const fsPx = parsePx(fontSize);
+  if (fsPx !== null && fsPx > 0) {
+    const ratio = px / fsPx;
+    const known: Record<string, string> = {
+      '-0.05': 'tracking-tighter',
+      '-0.025': 'tracking-tight',
+      '0.025': 'tracking-wide',
+      '0.05': 'tracking-wider',
+      '0.1': 'tracking-widest',
+    };
+    for (const [r, cls] of Object.entries(known)) {
+      if (Math.abs(ratio - parseFloat(r)) < 0.001) {
+        classes.push(cls);
+        return;
+      }
+    }
+  }
+  const neg = px < 0 ? '-' : '';
+  const abs = Math.abs(px);
+  classes.push(`${neg}tracking-[${abs}px]`);
 }
 
 /**

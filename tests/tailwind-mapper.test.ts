@@ -1122,6 +1122,66 @@ describe('mapStylesToTailwind', () => {
     expect(classes).toContain('w-[50%]');
   });
 
+  // ─── max-width rem scale tests ───
+
+  it('maps max-width 672px to max-w-2xl', () => {
+    const { classes } = mapStylesToTailwind(makeStyles({ maxWidth: '672px' }));
+    expect(classes).toContain('max-w-2xl');
+    expect(classes).not.toContain('max-w-[672px]');
+  });
+
+  it('maps max-width 512px to max-w-lg', () => {
+    const { classes } = mapStylesToTailwind(makeStyles({ maxWidth: '512px' }));
+    expect(classes).toContain('max-w-lg');
+  });
+
+  it('maps max-width 1280px to max-w-7xl', () => {
+    const { classes } = mapStylesToTailwind(makeStyles({ maxWidth: '1280px' }));
+    expect(classes).toContain('max-w-7xl');
+  });
+
+  it('falls back to arbitrary for non-scale max-width', () => {
+    const { classes } = mapStylesToTailwind(makeStyles({ maxWidth: '600px' }));
+    expect(classes).toContain('max-w-[600px]');
+  });
+
+  // ─── letter spacing (tracking) tests ───
+
+  it('maps letter-spacing -0.025em ratio (-1.8px on 72px) to tracking-tight', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({ letterSpacing: '-1.8px', fontSize: '72px' }),
+    );
+    expect(classes).toContain('tracking-tight');
+  });
+
+  it('maps letter-spacing -0.05em ratio to tracking-tighter', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({ letterSpacing: '-0.8px', fontSize: '16px' }),
+    );
+    expect(classes).toContain('tracking-tighter');
+  });
+
+  it('maps letter-spacing 0.1em ratio to tracking-widest', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({ letterSpacing: '1.6px', fontSize: '16px' }),
+    );
+    expect(classes).toContain('tracking-widest');
+  });
+
+  it('maps non-matching letter-spacing to arbitrary px', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({ letterSpacing: '3px', fontSize: '16px' }),
+    );
+    expect(classes).toContain('tracking-[3px]');
+  });
+
+  it('maps negative non-matching letter-spacing with leading minus', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({ letterSpacing: '-5px', fontSize: '16px' }),
+    );
+    expect(classes).toContain('-tracking-[5px]');
+  });
+
   // ─── aspect-ratio tests ───
 
   it('maps aspect-ratio 1 / 1 to aspect-square', () => {

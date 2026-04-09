@@ -258,6 +258,36 @@ export function extractStyles(element: Element): NormalizedStyles {
     }
   }
 
+  // img/video 等の置換要素は HTML width/height 属性経由で author がサイズ指定
+  // できる。これを authored マップに取り込む（CSSOM からは見えないため）。
+  if (element instanceof HTMLElement) {
+    const widthAttr = element.getAttribute('width');
+    if (widthAttr && !authored.has('width')) {
+      authored.set('width', widthAttr);
+    }
+    const heightAttr = element.getAttribute('height');
+    if (heightAttr && !authored.has('height')) {
+      authored.set('height', heightAttr);
+    }
+  }
+
+  // 各 size longhand について、authored の場合のみ値を返し、
+  // そうでなければ undefined を返す（mapper 側で skip される）。
+  // これにより max-width だけ authored な要素に w-[Npx] が出力されるのを防ぐ。
+  const maybeSize = (
+    prop:
+      | 'width'
+      | 'height'
+      | 'min-width'
+      | 'min-height'
+      | 'max-width'
+      | 'max-height',
+    computed: string,
+  ): string | undefined => {
+    if (!authored.has(prop)) return undefined;
+    return effectiveSize(authored.get(prop), computed);
+  };
+
   const effectiveOffset = (
     prop: 'top' | 'right' | 'bottom' | 'left',
     computed: string,
@@ -281,15 +311,17 @@ export function extractStyles(element: Element): NormalizedStyles {
   return {
     display: cs.display,
     position: cs.position,
-    // width/height/min-*/max-* は author が書いたキーワード値
-    // （100%, auto, min-content 等）を保持する。数値単位は computed を採用。
-    // これによって `w-full` や `h-full` が `w-[580px]` に化けるのを防ぐ。
-    width: effectiveSize(authored.get('width'), cs.width),
-    height: effectiveSize(authored.get('height'), cs.height),
-    minWidth: effectiveSize(authored.get('min-width'), cs.minWidth),
-    minHeight: effectiveSize(authored.get('min-height'), cs.minHeight),
-    maxWidth: effectiveSize(authored.get('max-width'), cs.maxWidth),
-    maxHeight: effectiveSize(authored.get('max-height'), cs.maxHeight),
+    // width/height/min-*/max-* は author が書いた longhand のみ出力する。
+    // author が書いたキーワード値（100%, auto, min-content 等）は保持し、
+    // 数値単位は computed を採用する。authored でないものは undefined にして
+    // mapper 側でスキップさせる（例: max-width だけ authored の要素で
+    // `w-[Npx]` が出力されるのを防ぐ）。
+    width: maybeSize('width', cs.width),
+    height: maybeSize('height', cs.height),
+    minWidth: maybeSize('min-width', cs.minWidth),
+    minHeight: maybeSize('min-height', cs.minHeight),
+    maxWidth: maybeSize('max-width', cs.maxWidth),
+    maxHeight: maybeSize('max-height', cs.maxHeight),
     margin: {
       top: effectiveMargin('margin-top', cs.marginTop),
       right: effectiveMargin('margin-right', cs.marginRight),
