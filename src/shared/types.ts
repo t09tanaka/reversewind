@@ -86,6 +86,7 @@ export type NormalizedStyles = {
   gridTemplateRows?: string;
   gridColumn?: string;
   gridRow?: string;
+  aspectRatio?: string;
   scale?: string;
   transform?: string;
   transition?: string;

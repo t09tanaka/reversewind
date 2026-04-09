@@ -443,7 +443,7 @@ export function mapStylesToTailwind(
     }
   }
 
-  // Flex
+  // Flex-specific
   if (styles.display === 'flex' || styles.display === 'inline-flex') {
     if (styles.flexDirection === 'column') classes.push('flex-col');
     if (styles.flexDirection === 'column-reverse')
@@ -453,7 +453,21 @@ export function mapStylesToTailwind(
     // row はデフォルトなので省略
     if (styles.flexWrap === 'wrap') classes.push('flex-wrap');
     if (styles.flexWrap === 'wrap-reverse') classes.push('flex-wrap-reverse');
+  }
 
+  // Grid container
+  if (styles.display === 'grid' || styles.display === 'inline-grid') {
+    mapGridTemplate(styles.gridTemplateColumns, 'grid-cols', classes);
+    mapGridTemplate(styles.gridTemplateRows, 'grid-rows', classes);
+  }
+
+  // justify-content / align-items は flex と grid の両方に効く
+  if (
+    styles.display === 'flex' ||
+    styles.display === 'inline-flex' ||
+    styles.display === 'grid' ||
+    styles.display === 'inline-grid'
+  ) {
     // justify-content: normal/stretch/flex-start はデフォルト
     if (
       styles.justifyContent &&
@@ -474,16 +488,13 @@ export function mapStylesToTailwind(
     }
   }
 
-  // Grid container
-  if (styles.display === 'grid' || styles.display === 'inline-grid') {
-    mapGridTemplate(styles.gridTemplateColumns, 'grid-cols', classes);
-    mapGridTemplate(styles.gridTemplateRows, 'grid-rows', classes);
-  }
-
   // Grid item (col-span / row-span 等)
   // display に依存せず常に評価する。auto はデフォルトなので省略
   mapGridItem(styles.gridColumn, 'col', classes);
   mapGridItem(styles.gridRow, 'row', classes);
+
+  // aspect-ratio
+  mapAspectRatio(styles.aspectRatio, classes);
 
   // Background image (gradient等)
   if (styles.backgroundImage && styles.backgroundImage !== 'none') {
@@ -1125,6 +1136,31 @@ function mapGridTemplate(
     return;
   }
   classes.push(`${prefix}-[${value.replace(/\s+/g, '_')}]`);
+}
+
+/**
+ * aspect-ratio の computed value を Tailwind aspect-* utility にマップする。
+ * ブラウザが返す形式: `"auto"`, `"1 / 1"`, `"4 / 5"`, `"16 / 9"`, `"2"` (= "2 / 1"), 等。
+ * - `auto` → 出力なし
+ * - `1 / 1` → `aspect-square`
+ * - `16 / 9` → `aspect-video`
+ * - それ以外 → arbitrary value `aspect-[4/5]`
+ */
+function mapAspectRatio(value: string | undefined, classes: string[]): void {
+  if (!value) return;
+  const normalized = value.trim();
+  if (normalized === 'auto' || normalized === '') return;
+  // 空白を除去して正規化（"4 / 5" → "4/5"）
+  const compact = normalized.replace(/\s+/g, '');
+  if (compact === '1/1' || compact === '1') {
+    classes.push('aspect-square');
+    return;
+  }
+  if (compact === '16/9') {
+    classes.push('aspect-video');
+    return;
+  }
+  classes.push(`aspect-[${compact}]`);
 }
 
 /**

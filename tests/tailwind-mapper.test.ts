@@ -1122,6 +1122,59 @@ describe('mapStylesToTailwind', () => {
     expect(classes).toContain('w-[50%]');
   });
 
+  // ─── aspect-ratio tests ───
+
+  it('maps aspect-ratio 1 / 1 to aspect-square', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({ aspectRatio: '1 / 1' }),
+    );
+    expect(classes).toContain('aspect-square');
+  });
+
+  it('maps aspect-ratio 16 / 9 to aspect-video', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({ aspectRatio: '16 / 9' }),
+    );
+    expect(classes).toContain('aspect-video');
+  });
+
+  it('maps aspect-ratio 4 / 5 to arbitrary aspect-[4/5]', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({ aspectRatio: '4 / 5' }),
+    );
+    expect(classes).toContain('aspect-[4/5]');
+  });
+
+  it('skips aspect-ratio auto', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({ aspectRatio: 'auto' }),
+    );
+    expect(classes.some((c) => c.startsWith('aspect-'))).toBe(false);
+  });
+
+  // ─── grid alignment tests ───
+
+  it('emits items-center on grid container', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({ display: 'grid', alignItems: 'center' }),
+    );
+    expect(classes).toContain('items-center');
+  });
+
+  it('emits justify-center on grid container', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({ display: 'grid', justifyContent: 'center' }),
+    );
+    expect(classes).toContain('justify-center');
+  });
+
+  it('does not emit items-center for non-flex/grid containers', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({ display: 'block', alignItems: 'center' }),
+    );
+    expect(classes).not.toContain('items-center');
+  });
+
   // ─── borderColor tests ───
 
   it('outputs border color from borderColor field', () => {

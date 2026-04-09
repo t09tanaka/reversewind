@@ -341,6 +341,7 @@ export function extractStyles(element: Element): NormalizedStyles {
     gridTemplateRows: cs.gridTemplateRows,
     gridColumn: cs.gridColumn,
     gridRow: cs.gridRow,
+    aspectRatio: cs.aspectRatio,
     scale: cs.getPropertyValue('scale'),
     transform: cs.transform,
     transition: cs.transition,
