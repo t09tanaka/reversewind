@@ -1598,6 +1598,37 @@ describe('optimizeOutputTree', () => {
     expect(out.classList).toContain('sticky');
   });
 
+  it('keeps relative when a non-zero z-index is present (arbitrary value)', () => {
+    // z-[2] needs positioning to apply — stripping relative would break
+    // the stacking intent.
+    const tree = el('div', ['flex', 'relative', 'z-[2]', 'p-2']);
+    const out = optimizeOutputTree(tree);
+    expect(out.classList).toContain('relative');
+    expect(out.classList).toContain('z-[2]');
+  });
+
+  it('keeps relative when a non-zero z-index is present (standard value)', () => {
+    const tree = el('div', ['flex', 'relative', 'z-10', 'p-2']);
+    const out = optimizeOutputTree(tree);
+    expect(out.classList).toContain('relative');
+    expect(out.classList).toContain('z-10');
+  });
+
+  it('keeps relative with negative z-index', () => {
+    const tree = el('div', ['flex', 'relative', 'z-[-1]', 'p-2']);
+    const out = optimizeOutputTree(tree);
+    expect(out.classList).toContain('relative');
+    expect(out.classList).toContain('z-[-1]');
+  });
+
+  it('still strips relative with z-0 only (regression guard)', () => {
+    // z-0 is default-level stacking, usually noise
+    const tree = el('div', ['flex', 'relative', 'z-0', 'p-2']);
+    const out = optimizeOutputTree(tree);
+    expect(out.classList).not.toContain('relative');
+    expect(out.classList).not.toContain('z-0');
+  });
+
   it('strips outer relative through multiple positioning contexts (X profile pattern)', () => {
     // Mirrors the X profile-image nested structure. items-center kept on outer
     // ensures flex isn't stripped so we can focus on positioning context logic.

@@ -1542,6 +1542,27 @@ function hasOffsetClass(classList: string[]): boolean {
 }
 
 /**
+ * 明示的な非ゼロ z-index class が付いているかを判定する。
+ * z-index は positioned element (relative/absolute/fixed/sticky) でないと
+ * 適用されないので、非ゼロ z-index があれば relative は剥がせない。
+ * z-0 はデフォルト層を明示しているだけのことが多いので非ゼロ扱いしない。
+ */
+function hasNonZeroZIndex(classList: string[]): boolean {
+  for (const c of classList) {
+    if (c === 'z-0') continue;
+    // 標準値 (z-10, z-20, z-30, z-40, z-50)
+    if (/^z-\d+$/.test(c)) return true;
+    // Arbitrary value: z-[2], z-[-1], z-[999]
+    const arb = c.match(/^z-\[(.+)\]$/);
+    if (arb) {
+      const val = arb[1];
+      if (val !== '0') return true;
+    }
+  }
+  return false;
+}
+
+/**
  * この要素に直接 anchor される（= 最近接の positioned 祖先になる）absolute/fixed 子孫が
  * あるかを判定する。途中で別の positioning context (relative/absolute/fixed/sticky) に
  * 当たったら、その枝はそこより深い absolute が別の要素に anchor されるのでスキップする。
@@ -1586,7 +1607,8 @@ function stripUselessRelative(node: OutputNode): OutputNode {
 
   const hasOffsets = hasOffsetClass(processed.classList);
   const hasPositionedChild = hasAnchoredAbsoluteDescendant(processed);
-  if (hasOffsets || hasPositionedChild) {
+  const hasMeaningfulZ = hasNonZeroZIndex(processed.classList);
+  if (hasOffsets || hasPositionedChild || hasMeaningfulZ) {
     return processed;
   }
 
