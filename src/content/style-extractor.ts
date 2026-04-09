@@ -4,6 +4,80 @@ import type {
   PseudoStyleMap,
 } from '../shared/types';
 
+import { collectAuthoredLonghandValues } from './css-rule-collector';
+
+/**
+ * authored 判定のために参照する longhand プロパティ一覧。
+ * 物理 longhand に加え、logical longhand（inset-*, margin-block-*, margin-inline-*）も
+ * 拾う。logical longhand はページが RTL や縦書きで positionや margin を指定している
+ * ケースで使われるため、writingMode / direction で物理側にマップする。
+ */
+const AUTHORED_OFFSET_AND_MARGIN_PROPS = [
+  'top',
+  'right',
+  'bottom',
+  'left',
+  'inset-block-start',
+  'inset-block-end',
+  'inset-inline-start',
+  'inset-inline-end',
+  'margin-top',
+  'margin-right',
+  'margin-bottom',
+  'margin-left',
+  'margin-block-start',
+  'margin-block-end',
+  'margin-inline-start',
+  'margin-inline-end',
+] as const;
+
+/**
+ * writingMode / direction から logical longhand を物理 longhand に変換する関数を返す。
+ * 現状は horizontal-tb（水平書字）のみ詳細にサポート。それ以外の writingMode では
+ * logical → 物理の厳密マッピングを諦め、すべての物理方向を「unknown」と扱えるよう
+ * null を返す（呼び出し側が保守的にフォールバックする想定）。
+ */
+function buildLogicalPhysicalResolver(
+  writingMode: string,
+  direction: string,
+): ((logical: string) => string | null) | null {
+  if (writingMode !== 'horizontal-tb') {
+    // 縦書き系は複雑なので呼び出し側で「logical が authored なら computed を信用」フォールバック
+    return null;
+  }
+  const ltr = direction !== 'rtl';
+  return (logical: string): string | null => {
+    switch (logical) {
+      case 'inset-block-start':
+      case 'margin-block-start':
+        return logical.startsWith('margin') ? 'margin-top' : 'top';
+      case 'inset-block-end':
+      case 'margin-block-end':
+        return logical.startsWith('margin') ? 'margin-bottom' : 'bottom';
+      case 'inset-inline-start':
+      case 'margin-inline-start':
+        return logical.startsWith('margin')
+          ? ltr
+            ? 'margin-left'
+            : 'margin-right'
+          : ltr
+            ? 'left'
+            : 'right';
+      case 'inset-inline-end':
+      case 'margin-inline-end':
+        return logical.startsWith('margin')
+          ? ltr
+            ? 'margin-right'
+            : 'margin-left'
+          : ltr
+            ? 'right'
+            : 'left';
+      default:
+        return null;
+    }
+  };
+}
+
 /** フォールバック対象プロパティ（Tailwind変換未対応） */
 const FALLBACK_PROPERTIES = [
   'backdrop-filter',
@@ -86,6 +160,71 @@ export function extractStyles(element: Element): NormalizedStyles {
     fallback[prop] = value;
   }
 
+  // position offset / margin の「author が実際に書いた値」を収集し、
+  // computed 値（常にピクセル化される）と突き合わせて auto 判定を復元する。
+  // 例: author が `absolute bottom-10 left-10` と書いた要素では computed top は
+  // 実際の位置（例: `650px`）が返るが、authored map には top が存在しないので auto と判断できる。
+  // 例: author が `mx-auto` と書いた中央寄せコンテナは computed marginLeft が `0px` でも
+  // authored map では `auto` が保存されているので mapper 側で mx-auto を出力できる。
+  const rawAuthored = collectAuthoredLonghandValues(
+    element,
+    AUTHORED_OFFSET_AND_MARGIN_PROPS,
+  );
+
+  // logical longhand を物理 longhand にマージ
+  // （horizontal-tb 以外の writingMode では logical → 物理 の解決を諦め、
+  //  該当要素では computed 値を素直に使うフォールバック動作に切り替える）
+  const resolver = buildLogicalPhysicalResolver(cs.writingMode, cs.direction);
+  const authored = new Map(rawAuthored);
+  let unresolvedLogical = false;
+  for (const [key, value] of rawAuthored) {
+    // physical longhand はそのまま
+    if (
+      key === 'top' ||
+      key === 'right' ||
+      key === 'bottom' ||
+      key === 'left' ||
+      key === 'margin-top' ||
+      key === 'margin-right' ||
+      key === 'margin-bottom' ||
+      key === 'margin-left'
+    ) {
+      continue;
+    }
+    // logical longhand → 物理にマップ
+    if (!resolver) {
+      // 縦書き系: 解決不能。フォールバック判定フラグを立てる
+      unresolvedLogical = true;
+      continue;
+    }
+    const mapped = resolver(key);
+    if (!mapped) continue;
+    // 既に physical longhand で authored 値があればそちらを優先（cascade の具体性近似）
+    if (!authored.has(mapped)) {
+      authored.set(mapped, value);
+    }
+  }
+
+  const effectiveOffset = (
+    prop: 'top' | 'right' | 'bottom' | 'left',
+    computed: string,
+  ): string => {
+    // writingMode が非水平で logical inset が使われている場合は安全に computed を採用
+    if (unresolvedLogical) return computed;
+    const a = authored.get(prop);
+    if (a === undefined) return 'auto';
+    if (a === 'auto') return 'auto';
+    return computed;
+  };
+  const effectiveMargin = (
+    prop: 'margin-top' | 'margin-right' | 'margin-bottom' | 'margin-left',
+    computed: string,
+  ): string => {
+    // `auto` 指定は cascade を通って computed ではピクセル化されるので、authored を優先
+    if (authored.get(prop) === 'auto') return 'auto';
+    return computed;
+  };
+
   return {
     display: cs.display,
     position: cs.position,
@@ -96,10 +235,10 @@ export function extractStyles(element: Element): NormalizedStyles {
     maxWidth: cs.maxWidth,
     maxHeight: cs.maxHeight,
     margin: {
-      top: cs.marginTop,
-      right: cs.marginRight,
-      bottom: cs.marginBottom,
-      left: cs.marginLeft,
+      top: effectiveMargin('margin-top', cs.marginTop),
+      right: effectiveMargin('margin-right', cs.marginRight),
+      bottom: effectiveMargin('margin-bottom', cs.marginBottom),
+      left: effectiveMargin('margin-left', cs.marginLeft),
     },
     padding: {
       top: cs.paddingTop,
@@ -129,10 +268,10 @@ export function extractStyles(element: Element): NormalizedStyles {
     zIndex: cs.zIndex,
     overflow: cs.overflow,
     boxSizing: cs.boxSizing,
-    top: cs.top,
-    right: cs.right,
-    bottom: cs.bottom,
-    left: cs.left,
+    top: effectiveOffset('top', cs.top),
+    right: effectiveOffset('right', cs.right),
+    bottom: effectiveOffset('bottom', cs.bottom),
+    left: effectiveOffset('left', cs.left),
     gap: cs.gap,
     rowGap: cs.rowGap,
     columnGap: cs.columnGap,
