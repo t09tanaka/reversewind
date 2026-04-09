@@ -136,7 +136,6 @@ const FALLBACK_PROPERTIES = [
   'isolation',
   'object-fit',
   'object-position',
-  'cursor',
   'user-select',
   'pointer-events',
   'resize',
@@ -158,7 +157,6 @@ const FALLBACK_PROPERTIES = [
 const FALLBACK_DEFAULTS: Record<string, Set<string>> = {
   'object-fit': new Set(['fill']),
   'object-position': new Set(['50% 50%']),
-  cursor: new Set(['default', 'auto']),
   'user-select': new Set(['auto']),
   'pointer-events': new Set(['auto']),
   resize: new Set(['none']),
@@ -386,6 +384,7 @@ export function extractStyles(element: Element): NormalizedStyles {
     scale: cs.getPropertyValue('scale'),
     transform: cs.transform,
     transition: cs.transition,
+    cursor: cs.cursor,
     fallback: Object.keys(fallback).length > 0 ? fallback : undefined,
   };
 }
@@ -454,6 +453,7 @@ const CSS_TO_NORMALIZED: Record<string, keyof NormalizedStyles> = {
   scale: 'scale',
   transform: 'transform',
   transition: 'transition',
+  cursor: 'cursor',
 };
 
 /** parsePseudoSelector の戻り値 */

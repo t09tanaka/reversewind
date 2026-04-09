@@ -165,6 +165,48 @@ const TEXT_TRANSFORM_MAP: Record<string, string> = {
   capitalize: 'capitalize',
 };
 
+// ─── Cursor ───
+// Tailwind v3 標準 cursor utility に寄せる。標準外の値（url() 等）は
+// inline style フォールバックに流す。
+const CURSOR_MAP: Record<string, string> = {
+  auto: 'cursor-auto',
+  default: 'cursor-default',
+  pointer: 'cursor-pointer',
+  wait: 'cursor-wait',
+  text: 'cursor-text',
+  move: 'cursor-move',
+  help: 'cursor-help',
+  'not-allowed': 'cursor-not-allowed',
+  none: 'cursor-none',
+  'context-menu': 'cursor-context-menu',
+  progress: 'cursor-progress',
+  cell: 'cursor-cell',
+  crosshair: 'cursor-crosshair',
+  'vertical-text': 'cursor-vertical-text',
+  alias: 'cursor-alias',
+  copy: 'cursor-copy',
+  'no-drop': 'cursor-no-drop',
+  grab: 'cursor-grab',
+  grabbing: 'cursor-grabbing',
+  'all-scroll': 'cursor-all-scroll',
+  'col-resize': 'cursor-col-resize',
+  'row-resize': 'cursor-row-resize',
+  'n-resize': 'cursor-n-resize',
+  'e-resize': 'cursor-e-resize',
+  's-resize': 'cursor-s-resize',
+  'w-resize': 'cursor-w-resize',
+  'ne-resize': 'cursor-ne-resize',
+  'nw-resize': 'cursor-nw-resize',
+  'se-resize': 'cursor-se-resize',
+  'sw-resize': 'cursor-sw-resize',
+  'ew-resize': 'cursor-ew-resize',
+  'ns-resize': 'cursor-ns-resize',
+  'nesw-resize': 'cursor-nesw-resize',
+  'nwse-resize': 'cursor-nwse-resize',
+  'zoom-in': 'cursor-zoom-in',
+  'zoom-out': 'cursor-zoom-out',
+};
+
 // ─── タグごとのデフォルト display 値 ───
 const TAG_DEFAULT_DISPLAY: Record<string, string> = {
   div: 'block',
@@ -251,6 +293,7 @@ const INHERITED_PROPERTIES: (keyof NormalizedStyles)[] = [
   'textAlign',
   'textTransform',
   'whiteSpace',
+  'cursor',
 ];
 
 // ─── Helpers ───
@@ -739,6 +782,22 @@ export function mapStylesToTailwind(
     }
   }
 
+  // Cursor — 継承チェック。auto/default はデフォルトなのでスキップ。
+  // Tailwind 標準値にマップできなければ inline style フォールバック。
+  if (
+    styles.cursor &&
+    styles.cursor !== 'auto' &&
+    styles.cursor !== 'default' &&
+    !isInherited('cursor', styles, parentStyles)
+  ) {
+    const cls = CURSOR_MAP[styles.cursor];
+    if (cls) {
+      classes.push(cls);
+    } else {
+      inlineStyles['cursor'] = styles.cursor;
+    }
+  }
+
   // Fallback styles
   if (styles.fallback) {
     for (const [prop, value] of Object.entries(styles.fallback)) {
@@ -972,6 +1031,30 @@ function pushBorderWidth(width: number, prefix: string, classes: string[]) {
   else classes.push(`${prefix}-[${width}px]`);
 }
 
+/**
+ * border color class を名前付き utility 優先で push する。
+ * 例: '#000000' → border-black, 'transparent' → border-transparent, '#1d9bf0' → border-[#1d9bf0]
+ */
+function pushBorderColorClass(
+  prefix: string,
+  color: string,
+  classes: string[],
+) {
+  if (color === 'transparent') {
+    classes.push(`${prefix}-transparent`);
+    return;
+  }
+  if (color === '#ffffff') {
+    classes.push(`${prefix}-white`);
+    return;
+  }
+  if (color === '#000000') {
+    classes.push(`${prefix}-black`);
+    return;
+  }
+  classes.push(`${prefix}-[${color}]`);
+}
+
 function mapBorder(styles: NormalizedStyles, classes: string[]) {
   const borders = [
     styles.borderTop,
@@ -979,10 +1062,14 @@ function mapBorder(styles: NormalizedStyles, classes: string[]) {
     styles.borderBottom,
     styles.borderLeft,
   ];
+  // border-style が none / hidden の辺は視覚的に描画されないため幅を 0 扱いにする
   const widths = borders.map((b) => {
     if (!b) return 0;
-    const match = b.match(/^([\d.]+)px/);
-    return match ? parseFloat(match[1]) : 0;
+    const match = b.match(/^([\d.]+)px\s+(\S+)/);
+    if (!match) return 0;
+    const style = match[2];
+    if (style === 'none' || style === 'hidden') return 0;
+    return parseFloat(match[1]);
   });
 
   const [top, right, bottom, left] = widths;
@@ -1008,13 +1095,14 @@ function mapBorder(styles: NormalizedStyles, classes: string[]) {
   const hasBorder = widths.some((w) => w > 0);
   if (hasBorder && !styles.borderColor) {
     const sideNames = ['border-t', 'border-r', 'border-b', 'border-l'];
+    // transparent も明示的な値として扱う（hover で色が変わるケース用）
     const colors = borders.map((b, i) => {
       if (widths[i] === 0 || !b) return null;
-      const colorPart = b.replace(/^[\d.]+px\s+\w+\s+/, '').trim();
+      const colorPart = b.replace(/^[\d.]+px\s+\S+\s+/, '').trim();
       if (!colorPart) return null;
       const hex = rgbToHex(colorPart);
-      if (hex === '#000000' || hex === 'transparent' || hex === colorPart)
-        return null;
+      // rgbToHex が正規化に失敗した場合（元の値が返る）はスキップ
+      if (hex === colorPart && !hex.startsWith('#')) return null;
       return hex;
     });
 
@@ -1022,8 +1110,8 @@ function mapBorder(styles: NormalizedStyles, classes: string[]) {
     const uniqueColors = [...new Set(validColors)];
 
     if (uniqueColors.length === 1) {
-      // 全辺同じ色
-      classes.push(`border-[${uniqueColors[0]}]`);
+      // 全辺同じ色 — 名前付き utility に寄せる
+      pushBorderColorClass('border', uniqueColors[0], classes);
     } else if (uniqueColors.length > 1) {
       // 最頻色をベースに、異なる辺を個別指定
       const colorCounts = new Map<string, number>();
@@ -1033,10 +1121,10 @@ function mapBorder(styles: NormalizedStyles, classes: string[]) {
       const baseColor = [...colorCounts.entries()].sort(
         (a, b) => b[1] - a[1],
       )[0][0];
-      classes.push(`border-[${baseColor}]`);
+      pushBorderColorClass('border', baseColor, classes);
       for (let i = 0; i < 4; i++) {
         if (colors[i] && colors[i] !== baseColor) {
-          classes.push(`${sideNames[i]}-[${colors[i]}]`);
+          pushBorderColorClass(sideNames[i], colors[i] as string, classes);
         }
       }
     }
@@ -1427,6 +1515,122 @@ function interleaveWithPseudo(
   }
 
   return result;
+}
+
+// ─── Tree-level post processing ───
+
+/** position: absolute / fixed を示すクラス（子孫に存在すると relative は剥がせない） */
+const POSITIONED_ANCHOR_CLASSES = new Set(['absolute', 'fixed']);
+
+/** position offset を示すクラスプレフィックス */
+const OFFSET_CLASS_REGEX =
+  /^-?(top|right|bottom|left|inset|inset-x|inset-y)(-|$)/;
+
+/** 意味のないラッパー候補となるタグ（その他のタグは構造的意図があるので剥がさない） */
+const COLLAPSIBLE_WRAPPER_TAGS = new Set(['div', 'span']);
+
+function hasOffsetClass(classList: string[]): boolean {
+  return classList.some((c) => OFFSET_CLASS_REGEX.test(c));
+}
+
+function hasPositionedDescendant(node: OutputNode): boolean {
+  for (const child of node.children) {
+    if (child.type !== 'element') continue;
+    if (child.classList.some((c) => POSITIONED_ANCHOR_CLASSES.has(c))) {
+      return true;
+    }
+    if (hasPositionedDescendant(child)) return true;
+  }
+  return false;
+}
+
+/**
+ * 視覚的効果のない `relative` と `z-0` を剥がす。
+ * - 本要素に top/right/bottom/left オフセットがない
+ * - 子孫に position: absolute/fixed がない
+ * 両方を満たす場合は `relative` と `z-0` を剥がす。
+ * `sticky` は常に維持する（offsets と組み合わせて意味を持つため）。
+ */
+function stripUselessRelative(node: OutputNode): OutputNode {
+  // bottom-up で先に子を処理
+  const newChildren: OutputChild[] = node.children.map((child) =>
+    child.type === 'element' ? stripUselessRelative(child) : child,
+  );
+  const processed: OutputNode = { ...node, children: newChildren };
+
+  const hasRelative = processed.classList.includes('relative');
+  if (!hasRelative) return processed;
+
+  const hasOffsets = hasOffsetClass(processed.classList);
+  const hasPositionedChild = hasPositionedDescendant(processed);
+  if (hasOffsets || hasPositionedChild) {
+    return processed;
+  }
+
+  // relative も z-0 も視覚的に効いていないので剥がす
+  const filtered = processed.classList.filter(
+    (c) => c !== 'relative' && c !== 'z-0',
+  );
+  return { ...processed, classList: filtered };
+}
+
+/**
+ * 装飾を持たないラッパー要素かどうか判定する。
+ * 畳み込み候補は div/span のみ（nav/section 等のセマンティックタグは構造的意図を尊重）。
+ */
+function isEmptyWrapper(node: OutputNode): boolean {
+  return (
+    COLLAPSIBLE_WRAPPER_TAGS.has(node.tagName) &&
+    node.classList.length === 0 &&
+    Object.keys(node.style).length === 0 &&
+    Object.keys(node.attributes).length === 0
+  );
+}
+
+/**
+ * 装飾を持たないラッパー要素を畳み込む。
+ * 各子要素について、その子が empty wrapper なら子の children を親の children に展開する。
+ * 自分自身が empty wrapper かつ element 子が 1 つだけなら、その element で置き換える。
+ * （自分の単一 text 子を親に持ち上げるのは親側の step で行う）
+ */
+function collapseWrappers(node: OutputNode): OutputNode {
+  // 1. 子を先に再帰処理
+  const processedChildren: OutputChild[] = node.children.map((child) =>
+    child.type === 'element' ? collapseWrappers(child) : child,
+  );
+
+  // 2. 各子について、empty wrapper ならその children を親に inline する
+  const inlinedChildren: OutputChild[] = [];
+  for (const child of processedChildren) {
+    if (child.type === 'element' && isEmptyWrapper(child)) {
+      inlinedChildren.push(...child.children);
+    } else {
+      inlinedChildren.push(child);
+    }
+  }
+
+  let current: OutputNode = { ...node, children: inlinedChildren };
+
+  // 3. 自分自身が empty wrapper で element 子が 1 つならその element に置き換える
+  while (
+    isEmptyWrapper(current) &&
+    current.children.length === 1 &&
+    current.children[0].type === 'element'
+  ) {
+    current = current.children[0] as OutputNode;
+  }
+
+  return current;
+}
+
+/**
+ * OutputNode ツリー全体に視覚的に無意味なノイズ削減を適用する。
+ * Pass 1: `relative` / `z-0` の無効化剥がし
+ * Pass 2: 装飾なしラッパー要素の畳み込み
+ */
+export function optimizeOutputTree(node: OutputNode): OutputNode {
+  const stripped = stripUselessRelative(node);
+  return collapseWrappers(stripped);
 }
 
 /**

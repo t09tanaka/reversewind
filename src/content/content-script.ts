@@ -1,7 +1,7 @@
 import { selectionStore } from './selection-store';
 import { findMeaningfulAncestor } from './bubble-up';
 import { extractSubtree } from './dom-extractor';
-import { convertToOutput } from './tailwind-mapper';
+import { convertToOutput, optimizeOutputTree } from './tailwind-mapper';
 import { generateHtml } from './html-generator';
 import { copyToClipboard } from './clipboard';
 import { showToast } from './toast';
@@ -91,7 +91,7 @@ function copyPage(sendResponse: (response: unknown) => void): true {
 
   const childrenHtml = extractedChildren
     .map((ext) => {
-      const output = convertToOutput(ext);
+      const output = optimizeOutputTree(convertToOutput(ext));
       return generateHtml(output, 1);
     })
     .join('\n');
@@ -122,7 +122,7 @@ function copyComponent(
   sendResponse: (response: unknown) => void,
 ): true {
   const extracted = extractSubtree(element, MAX_ELEMENTS);
-  const output = convertToOutput(extracted);
+  const output = optimizeOutputTree(convertToOutput(extracted));
   const html = generateHtml(output);
 
   copyToClipboard(html)

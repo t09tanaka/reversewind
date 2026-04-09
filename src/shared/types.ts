@@ -91,6 +91,7 @@ export type NormalizedStyles = {
   scale?: string;
   transform?: string;
   transition?: string;
+  cursor?: string;
   fallback?: Record<string, string>;
 };
 
