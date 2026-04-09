@@ -1549,9 +1549,11 @@ describe('optimizeOutputTree', () => {
   // ─── relative / z-0 suppression ───
 
   it('strips relative and z-0 from div with no offsets and no positioned descendants', () => {
+    // items-center keeps flex meaningful so we can verify relative/z-0 removal
+    // without being obscured by redundant-flex stripping.
     const tree = el(
       'div',
-      ['flex', 'relative', 'z-0', 'flex-col'],
+      ['flex', 'relative', 'z-0', 'flex-col', 'items-center'],
       [el('span', ['text-sm'], [{ type: 'text', content: 'hi' }])],
     );
     const out = optimizeOutputTree(tree);
@@ -1596,15 +1598,73 @@ describe('optimizeOutputTree', () => {
     expect(out.classList).toContain('sticky');
   });
 
-  it('strips relative recursively — inner wrapper loses relative, outer keeps it', () => {
+  it('strips outer relative through multiple positioning contexts (X profile pattern)', () => {
+    // Mirrors the X profile-image nested structure. items-center kept on outer
+    // ensures flex isn't stripped so we can focus on positioning context logic.
+    //   div.flex.items-center.relative.z-0.mr-2     ← strip relative/z-0
+    //     div.relative.z-0.max-w-full                ← strip relative/z-0
+    //       div.relative.w-10.h-10                   ← KEEP (direct absolute child)
+    //         div.absolute.inset-0
+    const tree = el(
+      'div',
+      ['flex', 'items-center', 'relative', 'z-0', 'mr-2'],
+      [
+        el(
+          'div',
+          ['relative', 'z-0', 'max-w-full', 'p-1'],
+          [
+            el(
+              'div',
+              ['relative', 'w-10', 'h-10'],
+              [el('div', ['absolute', 'inset-0'])],
+            ),
+          ],
+        ),
+      ],
+    );
+    const out = optimizeOutputTree(tree);
+    expect(out.classList).not.toContain('relative');
+    expect(out.classList).not.toContain('z-0');
+    expect(out.classList).toContain('flex');
+
+    const middle = out.children[0] as OutputNode;
+    expect(middle.classList).not.toContain('relative');
+    expect(middle.classList).not.toContain('z-0');
+
+    const inner = middle.children[0] as OutputNode;
+    expect(inner.classList).toContain('relative');
+  });
+
+  it('keeps relative when absolute descendant is reachable without crossing another context', () => {
+    // Deep nesting through non-positioned wrappers — relative must stay
     const tree = el(
       'div',
       ['relative'],
+      [
+        el(
+          'div',
+          ['flex', 'items-center'],
+          [el('div', ['p-4'], [el('div', ['absolute', 'inset-0'])])],
+        ),
+      ],
+    );
+    const out = optimizeOutputTree(tree);
+    expect(out.classList).toContain('relative');
+  });
+
+  it('strips outer relative when inner relative establishes positioning context', () => {
+    // Refined rule: outer should strip because the absolute is anchored to
+    // the inner relative, not the outer one. Outer has p-4 to avoid being
+    // collapsed by the wrapper pass.
+    const tree = el(
+      'div',
+      ['relative', 'p-4'],
       [el('div', ['relative', 'flex'], [el('div', ['absolute', 'inset-0'])])],
     );
     const out = optimizeOutputTree(tree);
-    // Outer has descendant with absolute via grandchild → keep
-    expect(out.classList).toContain('relative');
+    // Outer's absolute descendant is behind another relative → strip
+    expect(out.classList).not.toContain('relative');
+    expect(out.classList).toContain('p-4');
     // Inner directly contains the absolute child → keep
     const innerChild = out.children[0] as OutputNode;
     expect(innerChild.classList).toContain('relative');
@@ -1758,6 +1818,224 @@ describe('optimizeOutputTree', () => {
       return c;
     }
     expect(countDescendants(out)).toBeLessThanOrEqual(0);
+  });
+
+  // ─── empty element removal ───
+
+  it('removes empty span with only layout classes', () => {
+    // <span class="flex items-center"></span> has no visible effect when empty
+    const tree = el(
+      'div',
+      ['p-4'],
+      [
+        el('span', ['flex', 'items-center']),
+        el('span', ['text-lg'], [{ type: 'text', content: 'visible' }]),
+      ],
+    );
+    const out = optimizeOutputTree(tree);
+    // Empty span is removed, only the second child remains
+    expect(out.children.length).toBe(1);
+    expect((out.children[0] as OutputNode).tagName).toBe('span');
+  });
+
+  it('keeps empty div with background color', () => {
+    const tree = el(
+      'section',
+      ['p-4'],
+      [el('div', ['w-4', 'h-4', 'bg-red-500'])],
+    );
+    const out = optimizeOutputTree(tree);
+    expect(out.children.length).toBe(1);
+    const child = out.children[0] as OutputNode;
+    expect(child.classList).toContain('bg-red-500');
+  });
+
+  it('keeps empty div with sizing class', () => {
+    // An empty div with h-5 acts as a spacer — must keep
+    const tree = el(
+      'h2',
+      ['flex'],
+      [el('div', ['flex', 'h-5', 'flex-col', 'justify-center'])],
+    );
+    const out = optimizeOutputTree(tree);
+    expect(out.children.length).toBe(1);
+  });
+
+  it('keeps empty div with padding class', () => {
+    // pb-10 padding acts as a spacer — must keep
+    const tree = el('section', ['p-2'], [el('div', ['w-full', 'pb-10'])]);
+    const out = optimizeOutputTree(tree);
+    expect(out.children.length).toBe(1);
+    const child = out.children[0] as OutputNode;
+    expect(child.classList).toContain('pb-10');
+  });
+
+  it('keeps empty div with margin class (spacer)', () => {
+    const tree = el(
+      'section',
+      ['p-4'],
+      [el('div', ['flex', 'ml-1', 'justify-end'])],
+    );
+    const out = optimizeOutputTree(tree);
+    expect(out.children.length).toBe(1);
+    const child = out.children[0] as OutputNode;
+    expect(child.classList).toContain('ml-1');
+  });
+
+  it('keeps empty div with border', () => {
+    const tree = el('div', [], [el('div', ['w-4', 'h-4', 'border'])]);
+    const out = optimizeOutputTree(tree);
+    // empty div collapses, keeping the bordered square
+    expect(out.classList).toContain('border');
+  });
+
+  it('keeps empty element with attributes', () => {
+    const tree = el(
+      'div',
+      [],
+      [el('span', ['flex'], [], { attributes: { 'aria-label': 'important' } })],
+    );
+    const out = optimizeOutputTree(tree);
+    expect(out.tagName).toBe('span');
+    expect(out.attributes['aria-label']).toBe('important');
+  });
+
+  it('keeps empty element with inline style', () => {
+    const tree = el(
+      'div',
+      [],
+      [
+        el('span', ['flex'], [], {
+          style: { 'backdrop-filter': 'blur(10px)' },
+        }),
+      ],
+    );
+    const out = optimizeOutputTree(tree);
+    expect(out.tagName).toBe('span');
+    expect(out.style['backdrop-filter']).toBe('blur(10px)');
+  });
+
+  it('does not remove non-wrapper tags when empty (keeps img, svg, etc.)', () => {
+    const tree = el(
+      'div',
+      [],
+      [el('img', [], [], { attributes: { src: '/foo.png' } })],
+    );
+    const out = optimizeOutputTree(tree);
+    expect(out.tagName).toBe('img');
+  });
+
+  it('removes chain of empty wrappers after empty child is removed', () => {
+    // Inner empty span gets removed, making middle div empty and layout-only,
+    // which also gets removed.
+    const tree = el(
+      'section',
+      ['p-4'],
+      [el('div', ['flex', 'flex-col'], [el('span', ['flex', 'items-center'])])],
+    );
+    const out = optimizeOutputTree(tree);
+    // Both inner elements removed → section has 0 children
+    expect(out.children.length).toBe(0);
+    expect(out.tagName).toBe('section');
+  });
+
+  // ─── redundant flex compression ───
+
+  it('strips redundant flex/flex-col from single-element-child wrapper', () => {
+    // <div class="flex flex-col"> with single child → flex is no-op, strip
+    const tree = el(
+      'section',
+      ['p-4'],
+      [
+        el(
+          'div',
+          ['flex', 'flex-col'],
+          [el('p', ['text-sm'], [{ type: 'text', content: 'hi' }])],
+        ),
+      ],
+    );
+    const out = optimizeOutputTree(tree);
+    // After stripping flex/flex-col, the inner div is empty wrapper → collapses
+    expect(out.children.length).toBe(1);
+    const child = out.children[0] as OutputNode;
+    expect(child.tagName).toBe('p');
+  });
+
+  it('keeps flex when it has children-affecting companions (items-center)', () => {
+    // <div class="flex items-center"> with single child → items-center DOES
+    // have effect (centers the single child), so don't strip
+    const tree = el(
+      'section',
+      [],
+      [
+        el(
+          'div',
+          ['flex', 'items-center'],
+          [el('p', ['text-sm'], [{ type: 'text', content: 'hi' }])],
+        ),
+      ],
+    );
+    const out = optimizeOutputTree(tree);
+    // Inner div kept because of items-center
+    const child = out.children[0] as OutputNode;
+    expect(child.classList).toContain('flex');
+    expect(child.classList).toContain('items-center');
+  });
+
+  it('keeps flex when it has gap', () => {
+    const tree = el(
+      'section',
+      [],
+      [
+        el(
+          'div',
+          ['flex', 'gap-2'],
+          [el('p', [], [{ type: 'text', content: 'hi' }])],
+        ),
+      ],
+    );
+    const out = optimizeOutputTree(tree);
+    const child = out.children[0] as OutputNode;
+    expect(child.classList).toContain('flex');
+    expect(child.classList).toContain('gap-2');
+  });
+
+  it('does not strip flex when there are multiple children', () => {
+    const tree = el(
+      'section',
+      [],
+      [
+        el(
+          'div',
+          ['flex', 'flex-col'],
+          [
+            el('p', [], [{ type: 'text', content: 'a' }]),
+            el('p', [], [{ type: 'text', content: 'b' }]),
+          ],
+        ),
+      ],
+    );
+    const out = optimizeOutputTree(tree);
+    const child = out.children[0] as OutputNode;
+    expect(child.classList).toContain('flex');
+    expect(child.classList).toContain('flex-col');
+  });
+
+  it('does not strip flex when child is text (preserves text flow semantics)', () => {
+    const tree = el(
+      'section',
+      [],
+      [
+        el(
+          'div',
+          ['flex', 'flex-col'],
+          [{ type: 'text', content: 'just text' }],
+        ),
+      ],
+    );
+    const out = optimizeOutputTree(tree);
+    const child = out.children[0] as OutputNode;
+    expect(child.classList).toContain('flex');
   });
 
   it('integrates both passes: strips relative then collapses wrappers', () => {

@@ -1519,8 +1519,16 @@ function interleaveWithPseudo(
 
 // ─── Tree-level post processing ───
 
-/** position: absolute / fixed を示すクラス（子孫に存在すると relative は剥がせない） */
-const POSITIONED_ANCHOR_CLASSES = new Set(['absolute', 'fixed']);
+/** この要素に anchor される可能性がある子孫の position 値 */
+const ANCHOR_TARGET_CLASSES = new Set(['absolute', 'fixed']);
+
+/** 子孫方向への走査で positioning context の境界となる position 値 */
+const POSITIONING_CONTEXT_CLASSES = new Set([
+  'relative',
+  'absolute',
+  'fixed',
+  'sticky',
+]);
 
 /** position offset を示すクラスプレフィックス */
 const OFFSET_CLASS_REGEX =
@@ -1533,13 +1541,28 @@ function hasOffsetClass(classList: string[]): boolean {
   return classList.some((c) => OFFSET_CLASS_REGEX.test(c));
 }
 
-function hasPositionedDescendant(node: OutputNode): boolean {
+/**
+ * この要素に直接 anchor される（= 最近接の positioned 祖先になる）absolute/fixed 子孫が
+ * あるかを判定する。途中で別の positioning context (relative/absolute/fixed/sticky) に
+ * 当たったら、その枝はそこより深い absolute が別の要素に anchor されるのでスキップする。
+ * CSS 仕様: absolute は最近接の positioned 祖先に対してのみ位置決めされる。
+ */
+function hasAnchoredAbsoluteDescendant(node: OutputNode): boolean {
   for (const child of node.children) {
     if (child.type !== 'element') continue;
-    if (child.classList.some((c) => POSITIONED_ANCHOR_CLASSES.has(c))) {
+
+    // child 自体が absolute/fixed → この要素に anchor される
+    if (child.classList.some((c) => ANCHOR_TARGET_CLASSES.has(c))) {
       return true;
     }
-    if (hasPositionedDescendant(child)) return true;
+
+    // child が別の positioning context を生成している → その枝は探索中断
+    if (child.classList.some((c) => POSITIONING_CONTEXT_CLASSES.has(c))) {
+      continue;
+    }
+
+    // child は中立なラッパー → さらに深く探す
+    if (hasAnchoredAbsoluteDescendant(child)) return true;
   }
   return false;
 }
@@ -1562,7 +1585,7 @@ function stripUselessRelative(node: OutputNode): OutputNode {
   if (!hasRelative) return processed;
 
   const hasOffsets = hasOffsetClass(processed.classList);
-  const hasPositionedChild = hasPositionedDescendant(processed);
+  const hasPositionedChild = hasAnchoredAbsoluteDescendant(processed);
   if (hasOffsets || hasPositionedChild) {
     return processed;
   }
@@ -1572,6 +1595,105 @@ function stripUselessRelative(node: OutputNode): OutputNode {
     (c) => c !== 'relative' && c !== 'z-0',
   );
   return { ...processed, classList: filtered };
+}
+
+/**
+ * クラスが空要素に対して視覚的・レイアウト的な効果を持つかどうか判定する。
+ * flex/items-center/text-* 等は子要素・テキストがあって初めて効果が出るので、
+ * 空要素に付いていても無意味と見なす。
+ */
+function isEffectiveOnEmpty(cls: string): boolean {
+  // Positioning: absolute/fixed/sticky は配置を生む
+  if (cls === 'absolute' || cls === 'fixed' || cls === 'sticky') return true;
+  // Sizing
+  if (/^(w|h|min-w|min-h|max-w|max-h|size|aspect)-/.test(cls)) return true;
+  // Padding (p-, px-, py-, pt-, pr-, pb-, pl-)
+  if (/^p[trblxy]?-/.test(cls)) return true;
+  // Margin (including negative)
+  if (/^-?m[trblxy]?-/.test(cls)) return true;
+  // Position offsets (top-, -top-, inset-, etc.)
+  if (/^-?(top|right|bottom|left|inset|inset-x|inset-y)-/.test(cls)) {
+    return true;
+  }
+  // Background (bg-*, except bg-none / bg-transparent — still treat as visual
+  // for safety since gradients use bg-* too)
+  if (cls.startsWith('bg-')) return true;
+  // Border width / color（border-none, border-0 は非表示のため除外）
+  if (cls === 'border-none' || cls === 'border-0') return false;
+  if (cls === 'border' || cls.startsWith('border-')) return true;
+  // Ring / outline
+  if (cls.startsWith('ring') || cls.startsWith('outline-')) return true;
+  // Shadow
+  if (cls.startsWith('shadow') || cls.startsWith('drop-shadow')) return true;
+  // Transform — creates containing block
+  if (/^-?(scale|rotate|translate|skew)-/.test(cls)) return true;
+  if (cls === 'transform') return true;
+  // Opacity < 100 still renders a (transparent-ish) box, but on empty
+  // element that's still invisible → treat as non-effective
+  return false;
+}
+
+/** flex を container として設定する class */
+const FLEX_CONTAINER_CLASSES = new Set(['flex', 'inline-flex']);
+
+/** flex direction クラス（自身で flex direction を指定） */
+const FLEX_DIRECTION_CLASSES = new Set([
+  'flex-col',
+  'flex-row',
+  'flex-col-reverse',
+  'flex-row-reverse',
+]);
+
+/**
+ * flex container に付与されていると「単一子でも意味が残る」class。
+ * これらが付いている場合は flex を剥がさない。
+ */
+const FLEX_COMPANION_PATTERNS = [
+  /^items-/,
+  /^justify-/,
+  /^content-/,
+  /^place-/,
+  /^gap-/,
+  /^flex-wrap/,
+  /^flex-nowrap/,
+];
+
+function hasFlexCompanion(classList: string[]): boolean {
+  return classList.some((c) => FLEX_COMPANION_PATTERNS.some((p) => p.test(c)));
+}
+
+/**
+ * 単一 element 子を持つ flex container から、視覚効果のない `flex` / `flex-col` 等を剥がす。
+ * 条件:
+ *   - classList に flex / inline-flex がある
+ *   - 子がちょうど 1 つ、かつ element（text の場合 text flow が変わる恐れがあるので対象外）
+ *   - items-*, justify-*, gap-*, flex-wrap 等の同伴クラスが無い
+ */
+function stripRedundantFlex(node: OutputNode): OutputNode {
+  const cls = node.classList;
+  const hasFlex = cls.some((c) => FLEX_CONTAINER_CLASSES.has(c));
+  if (!hasFlex) return node;
+  if (node.children.length !== 1) return node;
+  if (node.children[0].type !== 'element') return node;
+  if (hasFlexCompanion(cls)) return node;
+
+  const filtered = cls.filter(
+    (c) => !FLEX_CONTAINER_CLASSES.has(c) && !FLEX_DIRECTION_CLASSES.has(c),
+  );
+  return { ...node, classList: filtered };
+}
+
+/**
+ * 空要素かつ視覚効果のないラッパーかどうか判定する。
+ * 削除候補は div/span のみ（semantic タグは構造的意図を保持）。
+ */
+function isRemovableEmptyElement(node: OutputNode): boolean {
+  if (node.children.length > 0) return false;
+  if (!COLLAPSIBLE_WRAPPER_TAGS.has(node.tagName)) return false;
+  if (Object.keys(node.attributes).length > 0) return false;
+  if (Object.keys(node.style).length > 0) return false;
+  // 視覚効果を持つクラスが 1 つでもあれば残す
+  return !node.classList.some(isEffectiveOnEmpty);
 }
 
 /**
@@ -1588,10 +1710,11 @@ function isEmptyWrapper(node: OutputNode): boolean {
 }
 
 /**
- * 装飾を持たないラッパー要素を畳み込む。
- * 各子要素について、その子が empty wrapper なら子の children を親の children に展開する。
+ * 装飾を持たないラッパー要素を畳み込む。ついでに視覚効果ゼロの空要素を除去する。
+ * 各子要素について:
+ *   - empty wrapper ならその children を親に inline
+ *   - 削除可能な空要素なら丸ごと削除
  * 自分自身が empty wrapper かつ element 子が 1 つだけなら、その element で置き換える。
- * （自分の単一 text 子を親に持ち上げるのは親側の step で行う）
  */
 function collapseWrappers(node: OutputNode): OutputNode {
   // 1. 子を先に再帰処理
@@ -1599,19 +1722,31 @@ function collapseWrappers(node: OutputNode): OutputNode {
     child.type === 'element' ? collapseWrappers(child) : child,
   );
 
-  // 2. 各子について、empty wrapper ならその children を親に inline する
-  const inlinedChildren: OutputChild[] = [];
+  // 2. 各子について、empty wrapper ならその children を親に inline、
+  //    視覚効果のない空要素は丸ごとドロップ
+  const filteredChildren: OutputChild[] = [];
   for (const child of processedChildren) {
-    if (child.type === 'element' && isEmptyWrapper(child)) {
-      inlinedChildren.push(...child.children);
-    } else {
-      inlinedChildren.push(child);
+    if (child.type !== 'element') {
+      filteredChildren.push(child);
+      continue;
     }
+    if (isRemovableEmptyElement(child)) {
+      // 視覚効果のない空要素 → 削除
+      continue;
+    }
+    if (isEmptyWrapper(child)) {
+      filteredChildren.push(...child.children);
+      continue;
+    }
+    filteredChildren.push(child);
   }
 
-  let current: OutputNode = { ...node, children: inlinedChildren };
+  let current: OutputNode = { ...node, children: filteredChildren };
 
-  // 3. 自分自身が empty wrapper で element 子が 1 つならその element に置き換える
+  // 3. 単一子の場合、自分自身の冗長な flex を剥がす（効果を生まないため）
+  current = stripRedundantFlex(current);
+
+  // 4. 自分自身が empty wrapper で element 子が 1 つならその element に置き換える
   while (
     isEmptyWrapper(current) &&
     current.children.length === 1 &&
