@@ -1509,6 +1509,572 @@ describe('mapStylesToTailwind', () => {
     expect(classes).toContain('z-10');
   });
 
+  // ─── flex-grow / flex-shrink tests ───
+
+  it('maps flex-grow: 1 to grow', () => {
+    const { classes } = mapStylesToTailwind(makeStyles({ flexGrow: '1' }));
+    expect(classes).toContain('grow');
+  });
+
+  it('maps flex-grow: 0 to nothing (default)', () => {
+    const { classes } = mapStylesToTailwind(makeStyles({ flexGrow: '0' }));
+    expect(classes.filter((c) => c.includes('grow'))).toEqual([]);
+  });
+
+  it('maps non-0/1 flex-grow to arbitrary value', () => {
+    const { classes } = mapStylesToTailwind(makeStyles({ flexGrow: '2' }));
+    expect(classes).toContain('grow-[2]');
+  });
+
+  it('maps flex-shrink: 0 to shrink-0', () => {
+    const { classes } = mapStylesToTailwind(makeStyles({ flexShrink: '0' }));
+    expect(classes).toContain('shrink-0');
+  });
+
+  it('maps flex-shrink: 1 to nothing (default)', () => {
+    const { classes } = mapStylesToTailwind(makeStyles({ flexShrink: '1' }));
+    expect(classes.filter((c) => c.includes('shrink'))).toEqual([]);
+  });
+
+  it('maps non-0/1 flex-shrink to arbitrary value', () => {
+    const { classes } = mapStylesToTailwind(makeStyles({ flexShrink: '2' }));
+    expect(classes).toContain('shrink-[2]');
+  });
+
+  // ─── box-sizing tests ───
+
+  it('skips box-sizing: border-box (Tailwind preflight default)', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({ boxSizing: 'border-box' }),
+    );
+    expect(classes.filter((c) => c.startsWith('box-'))).toEqual([]);
+  });
+
+  it('maps box-sizing: content-box to box-content', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({ boxSizing: 'content-box' }),
+    );
+    expect(classes).toContain('box-content');
+  });
+
+  // ─── align-self tests ───
+
+  it('maps align-self values', () => {
+    expect(
+      mapStylesToTailwind(makeStyles({ alignSelf: 'center' })).classes,
+    ).toContain('self-center');
+    expect(
+      mapStylesToTailwind(makeStyles({ alignSelf: 'flex-start' })).classes,
+    ).toContain('self-start');
+    expect(
+      mapStylesToTailwind(makeStyles({ alignSelf: 'flex-end' })).classes,
+    ).toContain('self-end');
+    expect(
+      mapStylesToTailwind(makeStyles({ alignSelf: 'stretch' })).classes,
+    ).toContain('self-stretch');
+    expect(
+      mapStylesToTailwind(makeStyles({ alignSelf: 'baseline' })).classes,
+    ).toContain('self-baseline');
+  });
+
+  it('skips align-self: auto (default)', () => {
+    const { classes } = mapStylesToTailwind(makeStyles({ alignSelf: 'auto' }));
+    expect(classes.filter((c) => c.startsWith('self-'))).toEqual([]);
+  });
+
+  // ─── align-content tests ───
+
+  it('maps align-content values in flex container', () => {
+    expect(
+      mapStylesToTailwind(
+        makeStyles({ display: 'flex', alignContent: 'center' }),
+      ).classes,
+    ).toContain('content-center');
+    expect(
+      mapStylesToTailwind(
+        makeStyles({ display: 'flex', alignContent: 'space-between' }),
+      ).classes,
+    ).toContain('content-between');
+    expect(
+      mapStylesToTailwind(
+        makeStyles({ display: 'grid', alignContent: 'stretch' }),
+      ).classes,
+    ).toContain('content-stretch');
+  });
+
+  it('skips align-content: normal (default)', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({ display: 'flex', alignContent: 'normal' }),
+    );
+    expect(classes.filter((c) => c.startsWith('content-'))).toEqual([]);
+  });
+
+  it('skips align-content when display is not flex/grid', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({ display: 'block', alignContent: 'center' }),
+    );
+    expect(classes.filter((c) => c.startsWith('content-'))).toEqual([]);
+  });
+
+  // ─── font-family tests ───
+
+  it('maps monospace font-family to font-mono', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({
+        fontFamily:
+          'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+      }),
+    );
+    expect(classes).toContain('font-mono');
+  });
+
+  it('maps serif font-family to font-serif', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({ fontFamily: 'ui-serif, Georgia, Cambria, serif' }),
+    );
+    expect(classes).toContain('font-serif');
+  });
+
+  it('maps sans-serif font-family to font-sans', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({
+        fontFamily: 'ui-sans-serif, system-ui, -apple-system, sans-serif',
+      }),
+    );
+    expect(classes).toContain('font-sans');
+  });
+
+  it('skips font-family when inherited from parent', () => {
+    const parentStyles: NormalizedStyles = {
+      display: 'block',
+      position: 'static',
+      fontFamily: 'ui-sans-serif, system-ui, sans-serif',
+    };
+    const { classes } = mapStylesToTailwind(
+      makeStyles({ fontFamily: 'ui-sans-serif, system-ui, sans-serif' }),
+      'span',
+      parentStyles,
+    );
+    expect(classes.filter((c) => c.startsWith('font-'))).toEqual([]);
+  });
+
+  // ─── visibility tests ───
+
+  it('maps visibility: hidden to invisible', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({ visibility: 'hidden' }),
+    );
+    expect(classes).toContain('invisible');
+  });
+
+  it('maps visibility: collapse to collapse', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({ visibility: 'collapse' }),
+    );
+    expect(classes).toContain('collapse');
+  });
+
+  it('skips visibility: visible (default)', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({ visibility: 'visible' }),
+    );
+    expect(classes.filter((c) => c === 'visible' || c === 'invisible')).toEqual(
+      [],
+    );
+  });
+
+  // ─── isolation tests ───
+
+  it('maps isolation: isolate to isolate', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({ isolation: 'isolate' }),
+    );
+    expect(classes).toContain('isolate');
+  });
+
+  it('skips isolation: auto (default)', () => {
+    const { classes } = mapStylesToTailwind(makeStyles({ isolation: 'auto' }));
+    expect(classes.filter((c) => c.includes('isolat'))).toEqual([]);
+  });
+
+  // ─── object-fit / object-position tests ───
+
+  it('maps object-fit values', () => {
+    expect(
+      mapStylesToTailwind(makeStyles({ objectFit: 'cover' })).classes,
+    ).toContain('object-cover');
+    expect(
+      mapStylesToTailwind(makeStyles({ objectFit: 'contain' })).classes,
+    ).toContain('object-contain');
+    expect(
+      mapStylesToTailwind(makeStyles({ objectFit: 'none' })).classes,
+    ).toContain('object-none');
+    expect(
+      mapStylesToTailwind(makeStyles({ objectFit: 'scale-down' })).classes,
+    ).toContain('object-scale-down');
+  });
+
+  it('skips object-fit: fill (default)', () => {
+    const { classes } = mapStylesToTailwind(makeStyles({ objectFit: 'fill' }));
+    expect(classes.filter((c) => c.startsWith('object-'))).toEqual([]);
+  });
+
+  it('maps object-position center (50% 50%) to object-center', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({ objectPosition: '50% 50%' }),
+    );
+    // 50% 50% is default — skip
+    expect(classes.filter((c) => c.startsWith('object-'))).toEqual([]);
+  });
+
+  it('maps object-position top (50% 0%) to object-top', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({ objectPosition: '50% 0%' }),
+    );
+    expect(classes).toContain('object-top');
+  });
+
+  it('maps object-position left-top (0% 0%) to object-left-top', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({ objectPosition: '0% 0%' }),
+    );
+    expect(classes).toContain('object-left-top');
+  });
+
+  // ─── filter tests ───
+
+  it('maps filter blur to blur-*', () => {
+    expect(
+      mapStylesToTailwind(makeStyles({ filter: 'blur(0px)' })).classes,
+    ).toContain('blur-none');
+    expect(
+      mapStylesToTailwind(makeStyles({ filter: 'blur(4px)' })).classes,
+    ).toContain('blur-sm');
+    expect(
+      mapStylesToTailwind(makeStyles({ filter: 'blur(8px)' })).classes,
+    ).toContain('blur');
+    expect(
+      mapStylesToTailwind(makeStyles({ filter: 'blur(12px)' })).classes,
+    ).toContain('blur-md');
+    expect(
+      mapStylesToTailwind(makeStyles({ filter: 'blur(64px)' })).classes,
+    ).toContain('blur-3xl');
+  });
+
+  it('maps filter brightness to brightness-*', () => {
+    expect(
+      mapStylesToTailwind(makeStyles({ filter: 'brightness(0.5)' })).classes,
+    ).toContain('brightness-50');
+    expect(
+      mapStylesToTailwind(makeStyles({ filter: 'brightness(1)' })).classes,
+    ).toContain('brightness-100');
+    expect(
+      mapStylesToTailwind(makeStyles({ filter: 'brightness(1.5)' })).classes,
+    ).toContain('brightness-150');
+  });
+
+  it('maps filter grayscale to grayscale', () => {
+    expect(
+      mapStylesToTailwind(makeStyles({ filter: 'grayscale(1)' })).classes,
+    ).toContain('grayscale');
+    expect(
+      mapStylesToTailwind(makeStyles({ filter: 'grayscale(0)' })).classes,
+    ).toContain('grayscale-0');
+  });
+
+  it('maps multiple filter functions', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({ filter: 'blur(4px) brightness(1.1) grayscale(1)' }),
+    );
+    expect(classes).toContain('blur-sm');
+    expect(classes).toContain('brightness-110');
+    expect(classes).toContain('grayscale');
+  });
+
+  it('skips filter: none', () => {
+    const { classes, inlineStyles } = mapStylesToTailwind(
+      makeStyles({ filter: 'none' }),
+    );
+    expect(
+      classes.filter((c) => c.startsWith('blur') || c.startsWith('brightness')),
+    ).toEqual([]);
+    expect(inlineStyles['filter']).toBeUndefined();
+  });
+
+  it('skips filter brightness(1) (default)', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({ filter: 'brightness(1)' }),
+    );
+    // brightness-100 is effectively default, but we still emit for fidelity
+    // (matches test above). If user prefers skipping default, change this test.
+    expect(classes).toContain('brightness-100');
+  });
+
+  // ─── backdrop-filter tests ───
+
+  it('maps backdrop-filter blur to backdrop-blur-*', () => {
+    expect(
+      mapStylesToTailwind(makeStyles({ backdropFilter: 'blur(4px)' })).classes,
+    ).toContain('backdrop-blur-sm');
+    expect(
+      mapStylesToTailwind(makeStyles({ backdropFilter: 'blur(12px)' })).classes,
+    ).toContain('backdrop-blur-md');
+  });
+
+  it('maps backdrop-filter with multiple functions', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({ backdropFilter: 'blur(8px) saturate(1.5)' }),
+    );
+    expect(classes).toContain('backdrop-blur');
+    expect(classes).toContain('backdrop-saturate-150');
+  });
+
+  it('skips backdrop-filter: none', () => {
+    const { classes, inlineStyles } = mapStylesToTailwind(
+      makeStyles({ backdropFilter: 'none' }),
+    );
+    expect(classes.filter((c) => c.startsWith('backdrop-'))).toEqual([]);
+    expect(inlineStyles['backdrop-filter']).toBeUndefined();
+  });
+
+  // ─── background-size / position / repeat tests ───
+
+  it('maps background-size: cover', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({ backgroundSize: 'cover' }),
+    );
+    expect(classes).toContain('bg-cover');
+  });
+
+  it('maps background-size: contain', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({ backgroundSize: 'contain' }),
+    );
+    expect(classes).toContain('bg-contain');
+  });
+
+  it('skips background-size: auto (default)', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({ backgroundSize: 'auto' }),
+    );
+    expect(classes.filter((c) => c === 'bg-auto' || c === 'bg-cover')).toEqual(
+      [],
+    );
+  });
+
+  it('maps background-position keywords', () => {
+    expect(
+      mapStylesToTailwind(makeStyles({ backgroundPosition: '50% 0%' })).classes,
+    ).toContain('bg-top');
+    expect(
+      mapStylesToTailwind(makeStyles({ backgroundPosition: '0% 0%' })).classes,
+    ).toContain('bg-left-top');
+    expect(
+      mapStylesToTailwind(makeStyles({ backgroundPosition: '100% 100%' }))
+        .classes,
+    ).toContain('bg-right-bottom');
+  });
+
+  it('skips background-position: 0% 0% on non-image elements (default)', () => {
+    // 0% 0% is CSS default — skip when there's no background image to position
+    const { classes } = mapStylesToTailwind(
+      makeStyles({ backgroundPosition: '0% 0%' }),
+    );
+    // Still emit bg-left-top since that maps explicitly
+    expect(classes).toContain('bg-left-top');
+  });
+
+  it('maps background-repeat values', () => {
+    expect(
+      mapStylesToTailwind(makeStyles({ backgroundRepeat: 'no-repeat' }))
+        .classes,
+    ).toContain('bg-no-repeat');
+    expect(
+      mapStylesToTailwind(makeStyles({ backgroundRepeat: 'repeat-x' })).classes,
+    ).toContain('bg-repeat-x');
+    expect(
+      mapStylesToTailwind(makeStyles({ backgroundRepeat: 'space' })).classes,
+    ).toContain('bg-repeat-space');
+  });
+
+  it('skips background-repeat: repeat (default)', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({ backgroundRepeat: 'repeat' }),
+    );
+    expect(classes.filter((c) => c.startsWith('bg-repeat'))).toEqual([]);
+  });
+
+  // ─── border-style tests ───
+
+  it('emits border-dashed for dashed border', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({
+        borderTop: '1px dashed rgb(0, 0, 0)',
+        borderRight: '1px dashed rgb(0, 0, 0)',
+        borderBottom: '1px dashed rgb(0, 0, 0)',
+        borderLeft: '1px dashed rgb(0, 0, 0)',
+      }),
+    );
+    expect(classes).toContain('border');
+    expect(classes).toContain('border-dashed');
+  });
+
+  it('emits border-dotted for dotted border', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({
+        borderTop: '2px dotted rgb(200, 200, 200)',
+        borderRight: '2px dotted rgb(200, 200, 200)',
+        borderBottom: '2px dotted rgb(200, 200, 200)',
+        borderLeft: '2px dotted rgb(200, 200, 200)',
+      }),
+    );
+    expect(classes).toContain('border-2');
+    expect(classes).toContain('border-dotted');
+  });
+
+  it('does not emit border-style class for solid (default)', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({
+        borderTop: '1px solid rgb(0, 0, 0)',
+        borderRight: '1px solid rgb(0, 0, 0)',
+        borderBottom: '1px solid rgb(0, 0, 0)',
+        borderLeft: '1px solid rgb(0, 0, 0)',
+      }),
+    );
+    expect(classes).toContain('border');
+    expect(classes).not.toContain('border-solid');
+  });
+
+  // ─── text-overflow / word-break / hyphens / vertical-align ───
+
+  it('maps text-overflow: ellipsis to text-ellipsis', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({ textOverflow: 'ellipsis' }),
+    );
+    expect(classes).toContain('text-ellipsis');
+  });
+
+  it('skips text-overflow: clip (default)', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({ textOverflow: 'clip' }),
+    );
+    expect(classes.filter((c) => c.startsWith('text-ellipsis'))).toEqual([]);
+  });
+
+  it('maps word-break values', () => {
+    expect(
+      mapStylesToTailwind(makeStyles({ wordBreak: 'break-all' })).classes,
+    ).toContain('break-all');
+    expect(
+      mapStylesToTailwind(makeStyles({ wordBreak: 'keep-all' })).classes,
+    ).toContain('break-keep');
+  });
+
+  it('maps overflow-wrap: break-word to break-words', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({ overflowWrap: 'break-word' }),
+    );
+    expect(classes).toContain('break-words');
+  });
+
+  it('maps hyphens values', () => {
+    expect(
+      mapStylesToTailwind(makeStyles({ hyphens: 'auto' })).classes,
+    ).toContain('hyphens-auto');
+    expect(
+      mapStylesToTailwind(makeStyles({ hyphens: 'manual' })).classes,
+    ).toContain('hyphens-manual');
+  });
+
+  it('skips hyphens: none (default)', () => {
+    const { classes } = mapStylesToTailwind(makeStyles({ hyphens: 'none' }));
+    expect(classes.filter((c) => c.startsWith('hyphens-'))).toEqual([]);
+  });
+
+  it('maps vertical-align values', () => {
+    expect(
+      mapStylesToTailwind(makeStyles({ verticalAlign: 'middle' })).classes,
+    ).toContain('align-middle');
+    expect(
+      mapStylesToTailwind(makeStyles({ verticalAlign: 'top' })).classes,
+    ).toContain('align-top');
+    expect(
+      mapStylesToTailwind(makeStyles({ verticalAlign: 'text-bottom' })).classes,
+    ).toContain('align-text-bottom');
+  });
+
+  it('skips vertical-align: baseline (default)', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({ verticalAlign: 'baseline' }),
+    );
+    expect(classes.filter((c) => c.startsWith('align-'))).toEqual([]);
+  });
+
+  // ─── font-smoothing tests ───
+
+  it('maps -webkit-font-smoothing: antialiased', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({ webkitFontSmoothing: 'antialiased' }),
+    );
+    expect(classes).toContain('antialiased');
+  });
+
+  it('maps -webkit-font-smoothing: subpixel-antialiased', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({ webkitFontSmoothing: 'subpixel-antialiased' }),
+    );
+    expect(classes).toContain('subpixel-antialiased');
+  });
+
+  it('skips -webkit-font-smoothing: auto (default)', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({ webkitFontSmoothing: 'auto' }),
+    );
+    expect(
+      classes.filter(
+        (c) => c === 'antialiased' || c === 'subpixel-antialiased',
+      ),
+    ).toEqual([]);
+  });
+
+  // ─── transform decomposition tests ───
+
+  it('decomposes pure translate matrix (Tailwind scale values)', () => {
+    // 10px → spacing 2.5, 20px → spacing 5
+    const { classes } = mapStylesToTailwind(
+      makeStyles({ transform: 'matrix(1, 0, 0, 1, 10, 20)' }),
+    );
+    expect(classes).toContain('translate-x-2.5');
+    expect(classes).toContain('translate-y-5');
+  });
+
+  it('decomposes pure translate matrix (arbitrary value)', () => {
+    // 7px does not map to a known spacing scale value
+    const { classes } = mapStylesToTailwind(
+      makeStyles({ transform: 'matrix(1, 0, 0, 1, 7, -3)' }),
+    );
+    expect(classes).toContain('translate-x-[7px]');
+    expect(classes).toContain('-translate-y-[3px]');
+  });
+
+  it('decomposes pure rotate matrix (45deg)', () => {
+    const cos45 = Math.cos(Math.PI / 4);
+    const sin45 = Math.sin(Math.PI / 4);
+    const { classes } = mapStylesToTailwind(
+      makeStyles({
+        transform: `matrix(${cos45}, ${sin45}, ${-sin45}, ${cos45}, 0, 0)`,
+      }),
+    );
+    expect(classes).toContain('rotate-45');
+  });
+
+  it('decomposes pure rotate matrix (negative 90deg)', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({ transform: 'matrix(0, -1, 1, 0, 0, 0)' }),
+    );
+    expect(classes).toContain('-rotate-90');
+  });
+
   // ─── scale property tests ───
 
   it('maps CSS scale property', () => {

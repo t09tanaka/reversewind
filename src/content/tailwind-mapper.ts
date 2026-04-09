@@ -150,6 +150,28 @@ const ALIGN_ITEMS_MAP: Record<string, string> = {
   stretch: 'items-stretch',
 };
 
+// ─── Align Self ───
+const ALIGN_SELF_MAP: Record<string, string> = {
+  auto: 'self-auto',
+  'flex-start': 'self-start',
+  'flex-end': 'self-end',
+  center: 'self-center',
+  stretch: 'self-stretch',
+  baseline: 'self-baseline',
+};
+
+// ─── Align Content ───
+const ALIGN_CONTENT_MAP: Record<string, string> = {
+  'flex-start': 'content-start',
+  'flex-end': 'content-end',
+  center: 'content-center',
+  stretch: 'content-stretch',
+  'space-between': 'content-between',
+  'space-around': 'content-around',
+  'space-evenly': 'content-evenly',
+  baseline: 'content-baseline',
+};
+
 // ─── Text Align ───
 const TEXT_ALIGN_MAP: Record<string, string> = {
   left: 'text-left',
@@ -164,6 +186,200 @@ const TEXT_TRANSFORM_MAP: Record<string, string> = {
   lowercase: 'lowercase',
   capitalize: 'capitalize',
 };
+
+// ─── Background size ───
+const BG_SIZE_MAP: Record<string, string> = {
+  cover: 'bg-cover',
+  contain: 'bg-contain',
+  // auto is default
+};
+
+// ─── Background position (% keyword combinations) ───
+const BG_POSITION_MAP: Record<string, string> = {
+  '0% 0%': 'bg-left-top',
+  '50% 0%': 'bg-top',
+  '100% 0%': 'bg-right-top',
+  '0% 50%': 'bg-left',
+  '50% 50%': 'bg-center',
+  '100% 50%': 'bg-right',
+  '0% 100%': 'bg-left-bottom',
+  '50% 100%': 'bg-bottom',
+  '100% 100%': 'bg-right-bottom',
+};
+
+// ─── Background repeat ───
+const BG_REPEAT_MAP: Record<string, string> = {
+  'no-repeat': 'bg-no-repeat',
+  'repeat-x': 'bg-repeat-x',
+  'repeat-y': 'bg-repeat-y',
+  space: 'bg-repeat-space',
+  round: 'bg-repeat-round',
+  // repeat is default
+};
+
+// ─── Border style ───
+const BORDER_STYLE_MAP: Record<string, string> = {
+  dashed: 'border-dashed',
+  dotted: 'border-dotted',
+  double: 'border-double',
+  // solid is default
+};
+
+// ─── Word break ───
+const WORD_BREAK_MAP: Record<string, string> = {
+  'break-all': 'break-all',
+  'keep-all': 'break-keep',
+  // normal is default
+};
+
+// ─── Vertical align ───
+const VERTICAL_ALIGN_MAP: Record<string, string> = {
+  top: 'align-top',
+  middle: 'align-middle',
+  bottom: 'align-bottom',
+  'text-top': 'align-text-top',
+  'text-bottom': 'align-text-bottom',
+  sub: 'align-sub',
+  super: 'align-super',
+  // baseline is default
+};
+
+// ─── Hyphens ───
+const HYPHENS_MAP: Record<string, string> = {
+  manual: 'hyphens-manual',
+  auto: 'hyphens-auto',
+  // none is default
+};
+
+// ─── Object fit ───
+const OBJECT_FIT_MAP: Record<string, string> = {
+  contain: 'object-contain',
+  cover: 'object-cover',
+  none: 'object-none',
+  'scale-down': 'object-scale-down',
+  // fill is default
+};
+
+// ─── Object position ───
+// Tailwind の object-position utility は 9 方向を持つ。computedStyle は
+// `0% 0%`, `50% 50%` 等で返る。キーワード (center, top, left) が指定された場合、
+// ブラウザは percent に正規化して返す。
+const OBJECT_POSITION_MAP: Record<string, string> = {
+  '0% 0%': 'object-left-top',
+  '50% 0%': 'object-top',
+  '100% 0%': 'object-right-top',
+  '0% 50%': 'object-left',
+  // '50% 50%': default, skip
+  '100% 50%': 'object-right',
+  '0% 100%': 'object-left-bottom',
+  '50% 100%': 'object-bottom',
+  '100% 100%': 'object-right-bottom',
+};
+
+// ─── Filter function → Tailwind class ───
+// blur の px 値を Tailwind の blur-* utility にマップする
+const BLUR_PX_MAP: Record<string, string> = {
+  '0': 'blur-none',
+  '4': 'blur-sm',
+  '8': 'blur',
+  '12': 'blur-md',
+  '16': 'blur-lg',
+  '24': 'blur-xl',
+  '40': 'blur-2xl',
+  '64': 'blur-3xl',
+};
+
+// brightness/contrast/saturate: 1.0 を基準に % 化
+const PERCENT_FILTER_VALUES: Record<string, number[]> = {
+  brightness: [0, 0.5, 0.75, 0.9, 0.95, 1, 1.05, 1.1, 1.25, 1.5, 2],
+  contrast: [0, 0.5, 0.75, 1, 1.25, 1.5, 2],
+  saturate: [0, 0.5, 1, 1.5, 2],
+};
+
+// grayscale/invert/sepia: 0..1 を 0 / 100% の二値に近似
+const BINARY_FILTER_VALUES = ['grayscale', 'invert', 'sepia'];
+
+// hue-rotate: deg 値から Tailwind の hue-rotate-* を求める
+const HUE_ROTATE_DEGREES = [0, 15, 30, 60, 90, 180];
+
+/**
+ * filter / backdrop-filter 関数文字列を解析し、Tailwind class の配列を返す。
+ * prefix: '' for filter, 'backdrop-' for backdrop-filter
+ */
+function parseFilterFunctions(
+  value: string,
+  prefix: '' | 'backdrop-',
+): string[] {
+  const classes: string[] = [];
+  // `fn(arg)` をトップレベルで抽出（arg 内にカッコがない前提で簡略化）
+  const fnRegex = /([a-z-]+)\(([^)]*)\)/g;
+  let match: RegExpExecArray | null;
+  while ((match = fnRegex.exec(value)) !== null) {
+    const fn = match[1];
+    const arg = match[2].trim();
+    const cls = mapFilterFunction(fn, arg, prefix);
+    if (cls) classes.push(cls);
+  }
+  return classes;
+}
+
+function mapFilterFunction(
+  fn: string,
+  arg: string,
+  prefix: '' | 'backdrop-',
+): string | null {
+  // blur(Npx)
+  if (fn === 'blur') {
+    const match = arg.match(/^([\d.]+)px$/);
+    if (!match) return null;
+    const px = match[1];
+    const named = BLUR_PX_MAP[px];
+    if (named) return prefix + named;
+    return `${prefix}blur-[${px}px]`;
+  }
+
+  // brightness/contrast/saturate: numeric multiplier
+  if (fn in PERCENT_FILTER_VALUES) {
+    const num = parseFloat(arg);
+    if (isNaN(num)) return null;
+    const known = PERCENT_FILTER_VALUES[fn];
+    if (known.includes(num)) {
+      const percent = Math.round(num * 100);
+      return `${prefix}${fn}-${percent}`;
+    }
+    return `${prefix}${fn}-[${num}]`;
+  }
+
+  // grayscale/invert/sepia: 0..1
+  if (BINARY_FILTER_VALUES.includes(fn)) {
+    const num = parseFloat(arg);
+    if (isNaN(num)) return null;
+    if (num === 0) return `${prefix}${fn}-0`;
+    if (num === 1) return `${prefix}${fn}`;
+    // Tailwind arbitrary: grayscale-[0.5]
+    return `${prefix}${fn}-[${num}]`;
+  }
+
+  // hue-rotate(deg)
+  if (fn === 'hue-rotate') {
+    const match = arg.match(/^(-?[\d.]+)deg$/);
+    if (!match) return null;
+    const deg = parseFloat(match[1]);
+    const abs = Math.abs(deg);
+    const neg = deg < 0 ? '-' : '';
+    if (HUE_ROTATE_DEGREES.includes(abs)) {
+      return `${neg}${prefix}hue-rotate-${abs}`;
+    }
+    return `${neg}${prefix}hue-rotate-[${abs}deg]`;
+  }
+
+  // drop-shadow: arbitrary value (Tailwind's named drop-shadows are rare)
+  if (fn === 'drop-shadow') {
+    return `${prefix}drop-shadow-[${arg.replace(/\s+/g, '_')}]`;
+  }
+
+  return null;
+}
 
 // ─── Cursor ───
 // Tailwind v3 標準 cursor utility に寄せる。標準外の値（url() 等）は
@@ -297,6 +513,22 @@ const INHERITED_PROPERTIES: (keyof NormalizedStyles)[] = [
 ];
 
 // ─── Helpers ───
+
+/**
+ * Font family stack から Tailwind の font-sans / font-serif / font-mono を推測する。
+ * キーワード (monospace, serif, sans-serif, ui-monospace, ui-serif, ui-sans-serif) を
+ * 含むかで判定する。どれにも該当しなければ null を返す（= 出力なし）。
+ */
+function detectFontFamilyClass(fontFamily: string): string | null {
+  const lower = fontFamily.toLowerCase();
+  if (/\b(ui-monospace|monospace)\b/.test(lower)) return 'font-mono';
+  if (/\b(ui-serif|serif)\b/.test(lower) && !lower.includes('sans-serif')) {
+    return 'font-serif';
+  }
+  if (/\b(ui-sans-serif|sans-serif|system-ui)\b/.test(lower))
+    return 'font-sans';
+  return null;
+}
 
 /**
  * "16px" → 16, それ以外はnull
@@ -550,6 +782,42 @@ export function mapStylesToTailwind(
       const cls = ALIGN_ITEMS_MAP[styles.alignItems];
       if (cls) classes.push(cls);
     }
+    // align-content: normal はデフォルト。flex/grid コンテナでのみ効果がある
+    if (styles.alignContent && styles.alignContent !== 'normal') {
+      const cls = ALIGN_CONTENT_MAP[styles.alignContent];
+      if (cls) classes.push(cls);
+    }
+  }
+
+  // align-self — auto はデフォルト（親の align-items を継承）
+  if (styles.alignSelf && styles.alignSelf !== 'auto') {
+    const cls = ALIGN_SELF_MAP[styles.alignSelf];
+    if (cls) classes.push(cls);
+  }
+
+  // flex-grow — 0 はデフォルト
+  if (styles.flexGrow && styles.flexGrow !== '0') {
+    if (styles.flexGrow === '1') {
+      classes.push('grow');
+    } else {
+      classes.push(`grow-[${styles.flexGrow}]`);
+    }
+  }
+
+  // flex-shrink — 1 はデフォルト
+  if (styles.flexShrink && styles.flexShrink !== '1') {
+    if (styles.flexShrink === '0') {
+      classes.push('shrink-0');
+    } else {
+      classes.push(`shrink-[${styles.flexShrink}]`);
+    }
+  }
+
+  // box-sizing — border-box は Tailwind preflight のデフォルト
+  if (styles.boxSizing && styles.boxSizing !== 'border-box') {
+    if (styles.boxSizing === 'content-box') {
+      classes.push('box-content');
+    }
   }
 
   // Grid item (col-span / row-span 等)
@@ -633,6 +901,12 @@ export function mapStylesToTailwind(
 
   // Box shadow
   mapBoxShadow(styles.boxShadow, classes, inlineStyles);
+
+  // Font family — 継承チェック。フォントスタック内のキーワードから推測する
+  if (styles.fontFamily && !isInherited('fontFamily', styles, parentStyles)) {
+    const cls = detectFontFamilyClass(styles.fontFamily);
+    if (cls) classes.push(cls);
+  }
 
   // Font size — 継承チェック
   if (styles.fontSize && !isInherited('fontSize', styles, parentStyles)) {
@@ -736,20 +1010,16 @@ export function mapStylesToTailwind(
     mapScale(styles.scale, classes);
   }
 
-  // Transform — none はデフォルト
+  // Transform — none はデフォルト。computed は常に matrix(a,b,c,d,tx,ty) 形式
   if (styles.transform && styles.transform !== 'none') {
-    const scaleMatch = styles.transform.match(
-      /^matrix\(([\d.]+),\s*0,\s*0,\s*([\d.]+)/,
-    );
-    if (scaleMatch) {
-      const sx = parseFloat(scaleMatch[1]);
-      const sy = parseFloat(scaleMatch[2]);
-      if (sx === sy && sx !== 1) {
-        mapScale(String(sx), classes);
-      }
-    } else {
+    const decomposed = decomposeTransformMatrix(styles.transform);
+    if (decomposed && decomposed.length > 0) {
+      classes.push(...decomposed);
+    } else if (decomposed === null) {
+      // 解析できない複雑な transform → inline style にフォールバック
       inlineStyles['transform'] = styles.transform;
     }
+    // decomposed === [] は identity matrix（出力なしで OK）
   }
 
   // Transition — duration 0s はデフォルト（Tailwind v4 リセット）なのでスキップ
@@ -785,6 +1055,117 @@ export function mapStylesToTailwind(
       } else if (ms !== 150) {
         classes.push(`duration-[${ms}ms]`);
       }
+    }
+  }
+
+  // Visibility — visible はデフォルト
+  if (styles.visibility && styles.visibility !== 'visible') {
+    if (styles.visibility === 'hidden') classes.push('invisible');
+    else if (styles.visibility === 'collapse') classes.push('collapse');
+  }
+
+  // Isolation — auto はデフォルト
+  if (styles.isolation && styles.isolation === 'isolate') {
+    classes.push('isolate');
+  }
+
+  // Object fit — fill はデフォルト
+  if (styles.objectFit && styles.objectFit !== 'fill') {
+    const cls = OBJECT_FIT_MAP[styles.objectFit];
+    if (cls) classes.push(cls);
+  }
+
+  // Object position — "50% 50%" はデフォルト
+  if (styles.objectPosition && styles.objectPosition !== '50% 50%') {
+    const cls = OBJECT_POSITION_MAP[styles.objectPosition];
+    if (cls) {
+      classes.push(cls);
+    } else {
+      // 非標準値 → arbitrary value
+      classes.push(`object-[${styles.objectPosition.replace(/\s+/g, '_')}]`);
+    }
+  }
+
+  // Filter — none はデフォルト
+  if (styles.filter && styles.filter !== 'none') {
+    const filterClasses = parseFilterFunctions(styles.filter, '');
+    if (filterClasses.length > 0) {
+      classes.push(...filterClasses);
+    } else {
+      // 解析失敗 → inline style フォールバック
+      inlineStyles['filter'] = styles.filter;
+    }
+  }
+
+  // Backdrop filter — none はデフォルト
+  if (styles.backdropFilter && styles.backdropFilter !== 'none') {
+    const filterClasses = parseFilterFunctions(
+      styles.backdropFilter,
+      'backdrop-',
+    );
+    if (filterClasses.length > 0) {
+      classes.push(...filterClasses);
+    } else {
+      inlineStyles['backdrop-filter'] = styles.backdropFilter;
+    }
+  }
+
+  // Background size — auto はデフォルト
+  if (styles.backgroundSize && styles.backgroundSize !== 'auto') {
+    const cls = BG_SIZE_MAP[styles.backgroundSize];
+    if (cls) classes.push(cls);
+  }
+
+  // Background position — キーワード組み合わせを Tailwind utility にマップ
+  if (styles.backgroundPosition) {
+    const cls = BG_POSITION_MAP[styles.backgroundPosition];
+    if (cls) classes.push(cls);
+  }
+
+  // Background repeat — repeat はデフォルト
+  if (styles.backgroundRepeat && styles.backgroundRepeat !== 'repeat') {
+    const cls = BG_REPEAT_MAP[styles.backgroundRepeat];
+    if (cls) classes.push(cls);
+  }
+
+  // Text overflow — clip はデフォルト
+  if (styles.textOverflow && styles.textOverflow === 'ellipsis') {
+    classes.push('text-ellipsis');
+  }
+
+  // Word break — normal はデフォルト
+  if (styles.wordBreak && styles.wordBreak !== 'normal') {
+    const cls = WORD_BREAK_MAP[styles.wordBreak];
+    if (cls) classes.push(cls);
+  }
+
+  // Overflow wrap — normal はデフォルト
+  if (styles.overflowWrap && styles.overflowWrap === 'break-word') {
+    classes.push('break-words');
+  }
+
+  // Hyphens — none/manual はブラウザデフォルトが曖昧なので auto/manual のみ出力
+  if (styles.hyphens && styles.hyphens !== 'none' && styles.hyphens !== '') {
+    const cls = HYPHENS_MAP[styles.hyphens];
+    if (cls) classes.push(cls);
+  }
+
+  // Vertical align — baseline はデフォルト
+  if (styles.verticalAlign && styles.verticalAlign !== 'baseline') {
+    const cls = VERTICAL_ALIGN_MAP[styles.verticalAlign];
+    if (cls) classes.push(cls);
+  }
+
+  // Font smoothing — auto はデフォルト
+  if (
+    styles.webkitFontSmoothing &&
+    styles.webkitFontSmoothing !== 'auto' &&
+    styles.webkitFontSmoothing !== ''
+  ) {
+    if (styles.webkitFontSmoothing === 'antialiased') {
+      classes.push('antialiased');
+    } else if (styles.webkitFontSmoothing === 'subpixel-antialiased') {
+      classes.push('subpixel-antialiased');
     }
   }
 
@@ -989,6 +1370,102 @@ function mapGap(value: string | undefined, prefix: string, classes: string[]) {
   classes.push(`${prefix}-${spacingClass(px)}`);
 }
 
+/**
+ * 2D transform matrix を decompose して Tailwind class のリストを返す。
+ *
+ * computed transform は常に `matrix(a, b, c, d, tx, ty)` または
+ * `matrix3d(...)` 形式で返る（matrix3d は未対応 → null）。
+ *
+ * 対応ケース (bare変換のみ):
+ *   - identity: matrix(1,0,0,1,0,0) → []
+ *   - pure translate: matrix(1,0,0,1,tx,ty)
+ *   - pure scale: matrix(sx,0,0,sy,0,0)
+ *   - pure rotate: matrix(cos,sin,-sin,cos,0,0)
+ *
+ * 複合変換は decomposition が曖昧なので null を返し、inline style に
+ * フォールバックさせる。
+ */
+function decomposeTransformMatrix(value: string): string[] | null {
+  const match = value.match(/^matrix\(([^)]+)\)$/);
+  if (!match) return null; // matrix3d 等
+  const nums = match[1].split(',').map((s) => parseFloat(s.trim()));
+  if (nums.length !== 6 || nums.some((n) => isNaN(n))) return null;
+  const [a, b, c, d, tx, ty] = nums;
+  const EPS = 1e-6;
+  const near = (x: number, y: number) => Math.abs(x - y) < EPS;
+
+  // Identity
+  if (
+    near(a, 1) &&
+    near(b, 0) &&
+    near(c, 0) &&
+    near(d, 1) &&
+    near(tx, 0) &&
+    near(ty, 0)
+  ) {
+    return [];
+  }
+
+  // Pure translate: a=1, b=0, c=0, d=1
+  if (near(a, 1) && near(b, 0) && near(c, 0) && near(d, 1)) {
+    const out: string[] = [];
+    if (!near(tx, 0)) out.push(formatTranslate('x', tx));
+    if (!near(ty, 0)) out.push(formatTranslate('y', ty));
+    return out;
+  }
+
+  // Pure scale: b=0, c=0, tx=0, ty=0
+  if (near(b, 0) && near(c, 0) && near(tx, 0) && near(ty, 0)) {
+    if (near(a, d)) {
+      const out: string[] = [];
+      mapScale(String(a), out);
+      return out;
+    }
+    const out: string[] = [];
+    if (!near(a, 1)) out.push(`scale-x-[${a}]`);
+    if (!near(d, 1)) out.push(`scale-y-[${d}]`);
+    return out;
+  }
+
+  // Pure rotate: a=d=cos(θ), b=-c=sin(θ), tx=ty=0, a²+b²=1
+  if (
+    near(tx, 0) &&
+    near(ty, 0) &&
+    near(a, d) &&
+    near(b, -c) &&
+    near(a * a + b * b, 1)
+  ) {
+    const rad = Math.atan2(b, a);
+    const deg = (rad * 180) / Math.PI;
+    return [formatRotate(deg)];
+  }
+
+  // 複合変換（scale+rotate, translate+rotate 等）は decomposition が曖昧
+  return null;
+}
+
+/** translate を Tailwind spacing scale or arbitrary value に変換 */
+function formatTranslate(axis: 'x' | 'y', px: number): string {
+  const abs = Math.abs(px);
+  const neg = px < 0 ? '-' : '';
+  if (abs in SPACING_MAP) {
+    return `${neg}translate-${axis}-${SPACING_MAP[abs]}`;
+  }
+  return `${neg}translate-${axis}-[${abs}px]`;
+}
+
+/** rotate の deg を Tailwind 標準値 or arbitrary value に変換 */
+function formatRotate(deg: number): string {
+  const rounded = Math.round(deg * 100) / 100;
+  const abs = Math.abs(rounded);
+  const neg = rounded < 0 ? '-' : '';
+  const knownDegrees = [0, 1, 2, 3, 6, 12, 45, 90, 180];
+  if (knownDegrees.includes(abs)) {
+    return `${neg}rotate-${abs}`;
+  }
+  return `${neg}rotate-[${abs}deg]`;
+}
+
 function mapScale(value: string, classes: string[]) {
   const num = parseFloat(value);
   if (isNaN(num) || num === 1) return;
@@ -1139,6 +1616,24 @@ function mapBorder(styles: NormalizedStyles, classes: string[]) {
   // Border color (独立指定 — base補正やpseudo-classのborder-color変更用)
   if (styles.borderColor) {
     mapColor(styles.borderColor, 'border', classes);
+  }
+
+  // Border style — solid (default) 以外の style を出力。全辺同じ style のみ対応
+  if (hasBorder) {
+    const styles2 = borders.map((b) => {
+      if (!b) return null;
+      const match = b.match(/^[\d.]+px\s+(\S+)/);
+      return match ? match[1] : null;
+    });
+    // 幅がある辺だけ見て style を集計
+    const relevantStyles = styles2.filter(
+      (s, i) => widths[i] > 0 && s !== null,
+    ) as string[];
+    const uniqueStyles = [...new Set(relevantStyles)];
+    if (uniqueStyles.length === 1 && uniqueStyles[0] !== 'solid') {
+      const cls = BORDER_STYLE_MAP[uniqueStyles[0]];
+      if (cls) classes.push(cls);
+    }
   }
 }
 

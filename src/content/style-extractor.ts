@@ -128,14 +128,9 @@ function buildLogicalPhysicalResolver(
 
 /** フォールバック対象プロパティ（Tailwind変換未対応） */
 const FALLBACK_PROPERTIES = [
-  'backdrop-filter',
-  'filter',
   'clip-path',
   'mask',
   'mix-blend-mode',
-  'isolation',
-  'object-fit',
-  'object-position',
   'user-select',
   'pointer-events',
   'resize',
@@ -385,6 +380,21 @@ export function extractStyles(element: Element): NormalizedStyles {
     transform: cs.transform,
     transition: cs.transition,
     cursor: cs.cursor,
+    visibility: cs.visibility,
+    isolation: cs.isolation,
+    objectFit: cs.objectFit,
+    objectPosition: cs.objectPosition,
+    filter: cs.filter,
+    backdropFilter: cs.getPropertyValue('backdrop-filter'),
+    backgroundSize: cs.backgroundSize,
+    backgroundPosition: cs.backgroundPosition,
+    backgroundRepeat: cs.backgroundRepeat,
+    textOverflow: cs.textOverflow,
+    wordBreak: cs.wordBreak,
+    overflowWrap: cs.overflowWrap,
+    hyphens: cs.getPropertyValue('hyphens'),
+    verticalAlign: cs.verticalAlign,
+    webkitFontSmoothing: cs.getPropertyValue('-webkit-font-smoothing'),
     fallback: Object.keys(fallback).length > 0 ? fallback : undefined,
   };
 }

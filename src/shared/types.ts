@@ -92,6 +92,21 @@ export type NormalizedStyles = {
   transform?: string;
   transition?: string;
   cursor?: string;
+  visibility?: string;
+  isolation?: string;
+  objectFit?: string;
+  objectPosition?: string;
+  filter?: string;
+  backdropFilter?: string;
+  backgroundSize?: string;
+  backgroundPosition?: string;
+  backgroundRepeat?: string;
+  textOverflow?: string;
+  wordBreak?: string;
+  overflowWrap?: string;
+  hyphens?: string;
+  verticalAlign?: string;
+  webkitFontSmoothing?: string;
   fallback?: Record<string, string>;
 };
 
