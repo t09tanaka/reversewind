@@ -438,8 +438,14 @@ export function mapStylesToTailwind(
     mapPositionOffset(styles.left, 'left', classes);
   }
 
-  // Z-index — autoはデフォルト
-  if (styles.zIndex && styles.zIndex !== 'auto') {
+  // Z-index — positioned element でないと効かないので、position: static では出力しない。
+  // pseudo styles の diff では position が undefined の場合もあり、その場合は
+  // 「position に変化なし」を意味するので既存の動作どおり出力する。
+  if (
+    styles.zIndex &&
+    styles.zIndex !== 'auto' &&
+    styles.position !== 'static'
+  ) {
     const z = parseInt(styles.zIndex);
     if (!isNaN(z)) {
       const knownZ = [0, 10, 20, 30, 40, 50];

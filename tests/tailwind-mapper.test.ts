@@ -1451,6 +1451,64 @@ describe('mapStylesToTailwind', () => {
     expect(inlineStyles['cursor']).toBe('url(/custom.cur), pointer');
   });
 
+  // ─── z-index gating by position ───
+
+  it('emits z-index when position is relative', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({ position: 'relative', zIndex: '2' }),
+    );
+    expect(classes).toContain('relative');
+    expect(classes).toContain('z-[2]');
+  });
+
+  it('emits z-index when position is absolute', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({ position: 'absolute', zIndex: '1' }),
+    );
+    expect(classes).toContain('absolute');
+    expect(classes).toContain('z-[1]');
+  });
+
+  it('emits z-index when position is fixed', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({ position: 'fixed', zIndex: '10' }),
+    );
+    expect(classes).toContain('fixed');
+    expect(classes).toContain('z-10');
+  });
+
+  it('emits z-index when position is sticky', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({ position: 'sticky', zIndex: '1' }),
+    );
+    expect(classes).toContain('sticky');
+    expect(classes).toContain('z-[1]');
+  });
+
+  it('suppresses z-index when position is static (z-index is inert)', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({ position: 'static', zIndex: '1' }),
+    );
+    expect(classes).not.toContain('z-[1]');
+    expect(classes).not.toContain('z-1');
+  });
+
+  it('suppresses negative z-index when position is static', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({ position: 'static', zIndex: '-1' }),
+    );
+    expect(classes).not.toContain('z-[-1]');
+  });
+
+  it('allows z-index in pseudo styles (position is undefined in diff)', () => {
+    // Pseudo-class diffs only include changed properties. A hover state that
+    // only changes z-index has position undefined — we still want to emit.
+    const { classes } = mapStylesToTailwind({
+      zIndex: '10',
+    } as NormalizedStyles);
+    expect(classes).toContain('z-10');
+  });
+
   // ─── scale property tests ───
 
   it('maps CSS scale property', () => {
