@@ -8,9 +8,10 @@ import { collectAuthoredLonghandValues } from './css-rule-collector';
 
 /**
  * authored 判定のために参照する longhand プロパティ一覧。
- * 物理 longhand に加え、logical longhand（inset-*, margin-block-*, margin-inline-*）も
- * 拾う。logical longhand はページが RTL や縦書きで positionや margin を指定している
- * ケースで使われるため、writingMode / direction で物理側にマップする。
+ * 物理 longhand に加え、logical longhand（inset-*, margin-block-*, margin-inline-*,
+ * inline-size, block-size）も拾う。logical longhand はページが RTL や縦書きで
+ * 位置や margin を指定しているケースで使われるため、writingMode / direction で
+ * 物理側にマップする。
  */
 const AUTHORED_OFFSET_AND_MARGIN_PROPS = [
   'top',
@@ -29,7 +30,39 @@ const AUTHORED_OFFSET_AND_MARGIN_PROPS = [
   'margin-block-end',
   'margin-inline-start',
   'margin-inline-end',
+  // width/height とその logical longhand
+  'width',
+  'height',
+  'min-width',
+  'min-height',
+  'max-width',
+  'max-height',
+  'inline-size',
+  'block-size',
+  'min-inline-size',
+  'min-block-size',
+  'max-inline-size',
+  'max-block-size',
 ] as const;
+
+/**
+ * author が書いた width/height 系の値がキーワード（%, auto, min-content 等）なら
+ * そのまま採用し、px/em/rem 等の数値単位なら computed 値を採用するための判定。
+ * Tailwind のサイズ utility はキーワード値からマップできる（w-full, w-auto, w-min 等）が、
+ * 数値単位は computed の方がブラウザ解決済みで扱いやすい。
+ */
+const SIZE_KEYWORD_REGEX =
+  /^(auto|none|min-content|max-content|fit-content|stretch|fill|inherit|initial|unset|revert|[\d.]+%)$/;
+
+function effectiveSize(
+  authoredValue: string | undefined,
+  computed: string,
+): string {
+  if (authoredValue && SIZE_KEYWORD_REGEX.test(authoredValue)) {
+    return authoredValue;
+  }
+  return computed;
+}
 
 /**
  * writingMode / direction から logical longhand を物理 longhand に変換する関数を返す。
@@ -72,6 +105,19 @@ function buildLogicalPhysicalResolver(
           : ltr
             ? 'right'
             : 'left';
+      // size 系: horizontal-tb では inline = width, block = height
+      case 'inline-size':
+        return 'width';
+      case 'block-size':
+        return 'height';
+      case 'min-inline-size':
+        return 'min-width';
+      case 'min-block-size':
+        return 'min-height';
+      case 'max-inline-size':
+        return 'max-width';
+      case 'max-block-size':
+        return 'max-height';
       default:
         return null;
     }
@@ -177,20 +223,25 @@ export function extractStyles(element: Element): NormalizedStyles {
   const resolver = buildLogicalPhysicalResolver(cs.writingMode, cs.direction);
   const authored = new Map(rawAuthored);
   let unresolvedLogical = false;
+  const LOGICAL_LONGHANDS = new Set([
+    'inset-block-start',
+    'inset-block-end',
+    'inset-inline-start',
+    'inset-inline-end',
+    'margin-block-start',
+    'margin-block-end',
+    'margin-inline-start',
+    'margin-inline-end',
+    'inline-size',
+    'block-size',
+    'min-inline-size',
+    'min-block-size',
+    'max-inline-size',
+    'max-block-size',
+  ]);
   for (const [key, value] of rawAuthored) {
     // physical longhand はそのまま
-    if (
-      key === 'top' ||
-      key === 'right' ||
-      key === 'bottom' ||
-      key === 'left' ||
-      key === 'margin-top' ||
-      key === 'margin-right' ||
-      key === 'margin-bottom' ||
-      key === 'margin-left'
-    ) {
-      continue;
-    }
+    if (!LOGICAL_LONGHANDS.has(key)) continue;
     // logical longhand → 物理にマップ
     if (!resolver) {
       // 縦書き系: 解決不能。フォールバック判定フラグを立てる
@@ -228,12 +279,15 @@ export function extractStyles(element: Element): NormalizedStyles {
   return {
     display: cs.display,
     position: cs.position,
-    width: cs.width,
-    height: cs.height,
-    minWidth: cs.minWidth,
-    minHeight: cs.minHeight,
-    maxWidth: cs.maxWidth,
-    maxHeight: cs.maxHeight,
+    // width/height/min-*/max-* は author が書いたキーワード値
+    // （100%, auto, min-content 等）を保持する。数値単位は computed を採用。
+    // これによって `w-full` や `h-full` が `w-[580px]` に化けるのを防ぐ。
+    width: effectiveSize(authored.get('width'), cs.width),
+    height: effectiveSize(authored.get('height'), cs.height),
+    minWidth: effectiveSize(authored.get('min-width'), cs.minWidth),
+    minHeight: effectiveSize(authored.get('min-height'), cs.minHeight),
+    maxWidth: effectiveSize(authored.get('max-width'), cs.maxWidth),
+    maxHeight: effectiveSize(authored.get('max-height'), cs.maxHeight),
     margin: {
       top: effectiveMargin('margin-top', cs.marginTop),
       right: effectiveMargin('margin-right', cs.marginRight),

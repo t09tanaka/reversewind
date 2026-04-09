@@ -765,6 +765,23 @@ function mapSize(value: string | undefined, prefix: string, classes: string[]) {
     classes.push(`${prefix}-screen`);
     return;
   }
+  if (value === 'min-content') {
+    classes.push(`${prefix}-min`);
+    return;
+  }
+  if (value === 'max-content') {
+    classes.push(`${prefix}-max`);
+    return;
+  }
+  if (value === 'fit-content') {
+    classes.push(`${prefix}-fit`);
+    return;
+  }
+  // 任意パーセンテージ（50%, 33.333% 等）は arbitrary value として出力
+  if (/^[\d.]+%$/.test(value)) {
+    classes.push(`${prefix}-[${value}]`);
+    return;
+  }
   // 0pxはデフォルト値としてスキップ（min-w, min-h）
   if (prefix.startsWith('min-') && value === '0px') return;
   const px = parsePx(value);

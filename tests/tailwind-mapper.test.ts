@@ -1084,6 +1084,44 @@ describe('mapStylesToTailwind', () => {
     expect(classes).toContain('-ml-[5px]');
   });
 
+  // ─── size keyword tests ───
+
+  it('maps width 100% to w-full', () => {
+    const { classes } = mapStylesToTailwind(makeStyles({ width: '100%' }));
+    expect(classes).toContain('w-full');
+  });
+
+  it('maps height 100% to h-full', () => {
+    const { classes } = mapStylesToTailwind(makeStyles({ height: '100%' }));
+    expect(classes).toContain('h-full');
+  });
+
+  it('maps width min-content to w-min', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({ width: 'min-content' }),
+    );
+    expect(classes).toContain('w-min');
+  });
+
+  it('maps width max-content to w-max', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({ width: 'max-content' }),
+    );
+    expect(classes).toContain('w-max');
+  });
+
+  it('maps width fit-content to w-fit', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({ width: 'fit-content' }),
+    );
+    expect(classes).toContain('w-fit');
+  });
+
+  it('maps arbitrary percentage width to w-[50%]', () => {
+    const { classes } = mapStylesToTailwind(makeStyles({ width: '50%' }));
+    expect(classes).toContain('w-[50%]');
+  });
+
   // ─── borderColor tests ───
 
   it('outputs border color from borderColor field', () => {
