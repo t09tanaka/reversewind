@@ -245,7 +245,7 @@ const INHERITED_PROPERTIES: (keyof NormalizedStyles)[] = [
  */
 export function parsePx(value: string | undefined): number | null {
   if (!value) return null;
-  const match = value.match(/^([\d.]+)px$/);
+  const match = value.match(/^(-?[\d.]+)px$/);
   if (!match) return null;
   return parseFloat(match[1]);
 }
@@ -256,6 +256,20 @@ export function parsePx(value: string | undefined): number | null {
 function spacingClass(px: number): string {
   if (px in SPACING_MAP) return SPACING_MAP[px];
   return `[${px}px]`;
+}
+
+/**
+ * 符号付きのspacing utility class名を生成する。
+ * 負値は既知値/任意値どちらも先頭に `-` を付与する（mapPositionOffset と同じ表記）。
+ * 例: -8 → `-ml-2`、-5 → `-ml-[5px]`
+ */
+function formatSpacingClass(prefix: string, side: string, px: number): string {
+  const abs = Math.abs(px);
+  const neg = px < 0 ? '-' : '';
+  if (abs in SPACING_MAP) {
+    return `${neg}${prefix}${side}-${SPACING_MAP[abs]}`;
+  }
+  return `${neg}${prefix}${side}-[${abs}px]`;
 }
 
 /**
@@ -460,11 +474,16 @@ export function mapStylesToTailwind(
     }
   }
 
-  // Grid
+  // Grid container
   if (styles.display === 'grid' || styles.display === 'inline-grid') {
     mapGridTemplate(styles.gridTemplateColumns, 'grid-cols', classes);
     mapGridTemplate(styles.gridTemplateRows, 'grid-rows', classes);
   }
+
+  // Grid item (col-span / row-span 等)
+  // display に依存せず常に評価する。auto はデフォルトなので省略
+  mapGridItem(styles.gridColumn, 'col', classes);
+  mapGridItem(styles.gridRow, 'row', classes);
 
   // Background image (gradient等)
   if (styles.backgroundImage && styles.backgroundImage !== 'none') {
@@ -507,8 +526,23 @@ export function mapStylesToTailwind(
     } else {
       const px = parsePx(styles.borderRadius);
       if (px !== null && px > 0) {
-        // 大きな値（999px以上）は rounded-full の意図
-        if (px >= 999) {
+        // 要素サイズの半分以上の半径なら視覚的に円/ピル形状 → rounded-full
+        // （ページ側がカスタムTailwind configで rounded-full を小さい値にしていても、
+        //   実サイズと比較することで誤検知しない）
+        const w = parsePx(styles.width);
+        const h = parsePx(styles.height);
+        const minSide =
+          w !== null && h !== null
+            ? Math.min(w, h)
+            : w !== null
+              ? w
+              : h !== null
+                ? h
+                : null;
+        if (minSide !== null && minSide > 0 && px >= minSide / 2) {
+          classes.push('rounded-full');
+        } else if (px >= 999) {
+          // サイズが取れないケース向けフォールバック（9999px等の明示的な円指定）
           classes.push('rounded-full');
         } else if (px in RADIUS_MAP) {
           classes.push(RADIUS_MAP[px]);
@@ -751,32 +785,85 @@ function mapSpacing(
 ) {
   if (!sides) return;
 
-  const top = parsePx(sides.top) ?? 0;
-  const right = parsePx(sides.right) ?? 0;
-  const bottom = parsePx(sides.bottom) ?? 0;
-  const left = parsePx(sides.left) ?? 0;
+  // margin のみ auto をサポート（padding には auto は存在しない）
+  const isMargin = prefix === 'm';
+  const isAuto = (v: string | undefined) => isMargin && v === 'auto';
 
-  // すべて0ならスキップ
-  if (top === 0 && right === 0 && bottom === 0 && left === 0) return;
+  // auto を先に分離して Tailwind の auto utility として出力
+  const autoTop = isAuto(sides.top);
+  const autoRight = isAuto(sides.right);
+  const autoBottom = isAuto(sides.bottom);
+  const autoLeft = isAuto(sides.left);
 
-  // 全方向同じ
-  if (top === right && right === bottom && bottom === left) {
-    classes.push(`${prefix}-${spacingClass(top)}`);
-    return;
+  if (isMargin) {
+    // 上下左右すべて auto
+    if (autoTop && autoRight && autoBottom && autoLeft) {
+      classes.push('m-auto');
+    }
+    // X軸のみ auto（mx-auto：中央寄せの最頻出ケース）
+    else if (autoLeft && autoRight && !autoTop && !autoBottom) {
+      classes.push('mx-auto');
+    }
+    // Y軸のみ auto
+    else if (autoTop && autoBottom && !autoLeft && !autoRight) {
+      classes.push('my-auto');
+    }
+    // 片側のみ
+    else {
+      if (autoTop) classes.push('mt-auto');
+      if (autoRight) classes.push('mr-auto');
+      if (autoBottom) classes.push('mb-auto');
+      if (autoLeft) classes.push('ml-auto');
+    }
   }
 
-  // X軸・Y軸が同じ
-  if (top === bottom && left === right) {
-    if (top !== 0) classes.push(`${prefix}y-${spacingClass(top)}`);
-    if (left !== 0) classes.push(`${prefix}x-${spacingClass(left)}`);
-    return;
+  // 残りの数値side を処理（auto は対象外）
+  const top = autoTop ? null : (parsePx(sides.top) ?? 0);
+  const right = autoRight ? null : (parsePx(sides.right) ?? 0);
+  const bottom = autoBottom ? null : (parsePx(sides.bottom) ?? 0);
+  const left = autoLeft ? null : (parsePx(sides.left) ?? 0);
+
+  // 数値値がすべて存在して 0 ならスキップ
+  const hasAnyNumeric =
+    top !== null || right !== null || bottom !== null || left !== null;
+  if (!hasAnyNumeric) return;
+
+  const allZero =
+    (top === null || top === 0) &&
+    (right === null || right === 0) &&
+    (bottom === null || bottom === 0) &&
+    (left === null || left === 0);
+  if (allZero) return;
+
+  // auto と数値が混在している場合、まとめ出力は諦めて個別出力
+  const hasAutoMix = autoTop || autoRight || autoBottom || autoLeft;
+
+  if (!hasAutoMix) {
+    // 全方向同じ
+    if (top === right && right === bottom && bottom === left) {
+      classes.push(formatSpacingClass(prefix, '', top as number));
+      return;
+    }
+
+    // X軸・Y軸が同じ
+    if (top === bottom && left === right) {
+      if (top !== 0)
+        classes.push(formatSpacingClass(prefix, 'y', top as number));
+      if (left !== 0)
+        classes.push(formatSpacingClass(prefix, 'x', left as number));
+      return;
+    }
   }
 
   // 個別
-  if (top !== 0) classes.push(`${prefix}t-${spacingClass(top)}`);
-  if (right !== 0) classes.push(`${prefix}r-${spacingClass(right)}`);
-  if (bottom !== 0) classes.push(`${prefix}b-${spacingClass(bottom)}`);
-  if (left !== 0) classes.push(`${prefix}l-${spacingClass(left)}`);
+  if (top !== null && top !== 0)
+    classes.push(formatSpacingClass(prefix, 't', top));
+  if (right !== null && right !== 0)
+    classes.push(formatSpacingClass(prefix, 'r', right));
+  if (bottom !== null && bottom !== 0)
+    classes.push(formatSpacingClass(prefix, 'b', bottom));
+  if (left !== null && left !== 0)
+    classes.push(formatSpacingClass(prefix, 'l', left));
 }
 
 function mapGap(value: string | undefined, prefix: string, classes: string[]) {
@@ -1021,6 +1108,82 @@ function mapGridTemplate(
     return;
   }
   classes.push(`${prefix}-[${value.replace(/\s+/g, '_')}]`);
+}
+
+/**
+ * grid-column / grid-row の computed value を col-span-* / row-span-* 等にマップする。
+ * ブラウザが返す値の例:
+ *   - "auto" / "auto / auto"                     → 出力なし
+ *   - "span 2 / span 2"                          → `${prefix}-span-2`
+ *   - "span 2"                                   → `${prefix}-span-2`
+ *   - "1 / span 2"                               → `${prefix}-start-1 ${prefix}-span-2`
+ *   - "1 / 3"                                    → `${prefix}-start-1 ${prefix}-end-3`
+ * これ以外の複雑な値は arbitrary value としてフォールバック出力する。
+ */
+function mapGridItem(
+  value: string | undefined,
+  prefix: 'col' | 'row',
+  classes: string[],
+) {
+  if (!value) return;
+  const normalized = value.trim();
+  if (normalized === 'auto' || normalized === 'auto / auto') return;
+
+  // "span N / span N" → col-span-N
+  const symmetricSpan = normalized.match(/^span\s+(\d+)\s*\/\s*span\s+\1$/);
+  if (symmetricSpan) {
+    classes.push(`${prefix}-span-${symmetricSpan[1]}`);
+    return;
+  }
+
+  // "span N" (ショートハンド、稀) → col-span-N
+  const shortSpan = normalized.match(/^span\s+(\d+)$/);
+  if (shortSpan) {
+    classes.push(`${prefix}-span-${shortSpan[1]}`);
+    return;
+  }
+
+  // 数値 grid line を出力する。負数は Tailwind 標準に該当 utility がないので
+  // arbitrary value 形式（col-start-[-1] 等）で出す。正数は utility 形式。
+  const emitLine = (num: number, side: 'start' | 'end', out: string[]) => {
+    if (num < 0) {
+      out.push(`${prefix}-${side}-[${num}]`);
+    } else {
+      out.push(`${prefix}-${side}-${num}`);
+    }
+  };
+
+  // "N / M" または "N / span M"
+  const parts = normalized.split('/').map((p) => p.trim());
+  if (parts.length === 2) {
+    const [start, end] = parts;
+    const out: string[] = [];
+    if (start !== 'auto') {
+      if (/^-?\d+$/.test(start)) {
+        emitLine(parseInt(start, 10), 'start', out);
+      } else {
+        // 不明な start → 全体を arbitrary
+        classes.push(`${prefix}-[${normalized.replace(/\s+/g, '_')}]`);
+        return;
+      }
+    }
+    if (end !== 'auto') {
+      const spanMatch = end.match(/^span\s+(\d+)$/);
+      if (spanMatch) {
+        out.push(`${prefix}-span-${spanMatch[1]}`);
+      } else if (/^-?\d+$/.test(end)) {
+        emitLine(parseInt(end, 10), 'end', out);
+      } else {
+        classes.push(`${prefix}-[${normalized.replace(/\s+/g, '_')}]`);
+        return;
+      }
+    }
+    classes.push(...out);
+    return;
+  }
+
+  // 上記いずれにもマッチしないケースは arbitrary value でフォールバック
+  classes.push(`${prefix}-[${normalized.replace(/\s+/g, '_')}]`);
 }
 
 /**

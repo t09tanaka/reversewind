@@ -194,6 +194,40 @@ describe('mapStylesToTailwind', () => {
     expect(classes).toContain('rounded-full');
   });
 
+  it('detects rounded-full via size heuristic (br >= min(w,h)/2)', () => {
+    // 32x32 with br 16px → 円
+    const { classes } = mapStylesToTailwind(
+      makeStyles({ borderRadius: '16px', width: '32px', height: '32px' }),
+    );
+    expect(classes).toContain('rounded-full');
+    expect(classes).not.toContain('rounded-2xl');
+  });
+
+  it('detects rounded-full via size heuristic on pill shape', () => {
+    // 80x32 with br 16px → ピル形状（短辺32の半分16に等しい）
+    const { classes } = mapStylesToTailwind(
+      makeStyles({ borderRadius: '16px', width: '80px', height: '32px' }),
+    );
+    expect(classes).toContain('rounded-full');
+  });
+
+  it('does not mark as rounded-full when br smaller than half of min side', () => {
+    // 32x32 with br 12px → 12 < 16 なので rounded-xl のまま
+    const { classes } = mapStylesToTailwind(
+      makeStyles({ borderRadius: '12px', width: '32px', height: '32px' }),
+    );
+    expect(classes).toContain('rounded-xl');
+    expect(classes).not.toContain('rounded-full');
+  });
+
+  it('falls back to >=999 heuristic when size is unknown', () => {
+    // サイズ情報なしでは視覚判定不可 → 999px フォールバック
+    const { classes } = mapStylesToTailwind(
+      makeStyles({ borderRadius: '9999px' }),
+    );
+    expect(classes).toContain('rounded-full');
+  });
+
   it('maps background color', () => {
     const { classes } = mapStylesToTailwind(
       makeStyles({ backgroundColor: 'rgb(255, 255, 255)' }),
@@ -857,6 +891,78 @@ describe('mapStylesToTailwind', () => {
     expect(classes).toContain('grid-rows-2');
   });
 
+  // ─── grid item span tests ───
+
+  it('maps gridColumn "span 2 / span 2" to col-span-2', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({ gridColumn: 'span 2 / span 2' }),
+    );
+    expect(classes).toContain('col-span-2');
+  });
+
+  it('maps gridRow "span 3 / span 3" to row-span-3', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({ gridRow: 'span 3 / span 3' }),
+    );
+    expect(classes).toContain('row-span-3');
+  });
+
+  it('skips gridColumn "auto"', () => {
+    const { classes } = mapStylesToTailwind(makeStyles({ gridColumn: 'auto' }));
+    expect(classes.some((c) => c.startsWith('col-'))).toBe(false);
+  });
+
+  it('skips gridRow "auto / auto"', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({ gridRow: 'auto / auto' }),
+    );
+    expect(classes.some((c) => c.startsWith('row-'))).toBe(false);
+  });
+
+  it('maps "1 / span 2" to col-start-1 col-span-2', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({ gridColumn: '1 / span 2' }),
+    );
+    expect(classes).toContain('col-start-1');
+    expect(classes).toContain('col-span-2');
+  });
+
+  it('maps "2 / 4" to col-start-2 col-end-4', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({ gridColumn: '2 / 4' }),
+    );
+    expect(classes).toContain('col-start-2');
+    expect(classes).toContain('col-end-4');
+  });
+
+  it('emits col-span-* even when parent is not a grid (grid item inherits style)', () => {
+    // grid item は親が grid。display はこの要素自身の display であり grid でない
+    const { classes } = mapStylesToTailwind(
+      makeStyles({ display: 'block', gridColumn: 'span 2 / span 2' }),
+    );
+    expect(classes).toContain('col-span-2');
+  });
+
+  it('maps "1 / -1" to col-start-1 col-end-[-1] using arbitrary for negative line', () => {
+    // 末尾基準の負の grid line は Tailwind 標準 utility に無いので arbitrary にフォールバック
+    const { classes } = mapStylesToTailwind(
+      makeStyles({ gridColumn: '1 / -1' }),
+    );
+    expect(classes).toContain('col-start-1');
+    expect(classes).toContain('col-end-[-1]');
+    // 無効な `col-end--1` を生成していないこと
+    expect(classes).not.toContain('col-end--1');
+  });
+
+  it('maps "-2 / -1" to col-start-[-2] col-end-[-1]', () => {
+    const { classes } = mapStylesToTailwind(makeStyles({ gridRow: '-2 / -1' }));
+    expect(classes).toContain('row-start-[-2]');
+    expect(classes).toContain('row-end-[-1]');
+    expect(
+      classes.some((c) => c === 'row-start--2' || c === 'row-end--1'),
+    ).toBe(false);
+  });
+
   it('skips grid-template when value is none', () => {
     const { classes } = mapStylesToTailwind(
       makeStyles({
@@ -865,6 +971,117 @@ describe('mapStylesToTailwind', () => {
       }),
     );
     expect(classes).not.toContain('grid-cols-none');
+  });
+
+  // ─── margin auto tests (mx-auto / ml-auto etc.) ───
+
+  it('maps margin auto on both sides to mx-auto', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({
+        margin: { top: '0px', right: 'auto', bottom: '0px', left: 'auto' },
+      }),
+    );
+    expect(classes).toContain('mx-auto');
+    expect(
+      classes.some((c) => c.startsWith('m-[') || c.startsWith('mx-[')),
+    ).toBe(false);
+  });
+
+  it('maps margin auto on vertical sides to my-auto', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({
+        margin: { top: 'auto', right: '0px', bottom: 'auto', left: '0px' },
+      }),
+    );
+    expect(classes).toContain('my-auto');
+  });
+
+  it('maps margin auto on single side to ml-auto', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({
+        margin: { top: '0px', right: '0px', bottom: '0px', left: 'auto' },
+      }),
+    );
+    expect(classes).toContain('ml-auto');
+  });
+
+  it('maps margin auto on all sides to m-auto', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({
+        margin: { top: 'auto', right: 'auto', bottom: 'auto', left: 'auto' },
+      }),
+    );
+    expect(classes).toContain('m-auto');
+  });
+
+  it('mixes mx-auto with numeric vertical margin', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({
+        margin: { top: '16px', right: 'auto', bottom: '16px', left: 'auto' },
+      }),
+    );
+    expect(classes).toContain('mx-auto');
+    expect(classes).toContain('mt-4');
+    expect(classes).toContain('mb-4');
+  });
+
+  it('does not treat padding "auto" as meaningful', () => {
+    // padding に auto は存在しないので値は無視される
+    const { classes } = mapStylesToTailwind(
+      makeStyles({
+        padding: { top: 'auto', right: '0px', bottom: 'auto', left: '0px' },
+      }),
+    );
+    expect(classes).not.toContain('py-auto');
+    expect(classes).not.toContain('p-auto');
+  });
+
+  // ─── negative margin tests ───
+
+  it('maps negative left margin to -ml-2', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({
+        margin: { top: '0px', right: '0px', bottom: '0px', left: '-8px' },
+      }),
+    );
+    expect(classes).toContain('-ml-2');
+  });
+
+  it('maps uniform negative margin to -m-4', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({
+        margin: {
+          top: '-16px',
+          right: '-16px',
+          bottom: '-16px',
+          left: '-16px',
+        },
+      }),
+    );
+    expect(classes).toContain('-m-4');
+  });
+
+  it('maps negative x-axis margin to -mx-3', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({
+        margin: {
+          top: '0px',
+          right: '-12px',
+          bottom: '0px',
+          left: '-12px',
+        },
+      }),
+    );
+    expect(classes).toContain('-mx-3');
+  });
+
+  it('maps negative margin arbitrary value with leading minus', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({
+        margin: { top: '0px', right: '0px', bottom: '0px', left: '-5px' },
+      }),
+    );
+    expect(classes).toContain('-ml-[5px]');
   });
 
   // ─── borderColor tests ───
