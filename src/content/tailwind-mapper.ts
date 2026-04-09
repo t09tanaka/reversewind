@@ -245,10 +245,11 @@ const VERTICAL_ALIGN_MAP: Record<string, string> = {
 };
 
 // ─── Hyphens ───
+// CSS spec: initial value is `manual`. Skip that and emit the others.
 const HYPHENS_MAP: Record<string, string> = {
-  manual: 'hyphens-manual',
+  none: 'hyphens-none',
   auto: 'hyphens-auto',
-  // none is default
+  // manual is CSS default
 };
 
 // ─── Object fit ───
@@ -510,6 +511,11 @@ const INHERITED_PROPERTIES: (keyof NormalizedStyles)[] = [
   'textTransform',
   'whiteSpace',
   'cursor',
+  'hyphens',
+  'visibility',
+  'wordBreak',
+  'overflowWrap',
+  'webkitFontSmoothing',
 ];
 
 // ─── Helpers ───
@@ -1058,8 +1064,12 @@ export function mapStylesToTailwind(
     }
   }
 
-  // Visibility — visible はデフォルト
-  if (styles.visibility && styles.visibility !== 'visible') {
+  // Visibility — visible はデフォルト。継承プロパティ
+  if (
+    styles.visibility &&
+    styles.visibility !== 'visible' &&
+    !isInherited('visibility', styles, parentStyles)
+  ) {
     if (styles.visibility === 'hidden') classes.push('invisible');
     else if (styles.visibility === 'collapse') classes.push('collapse');
   }
@@ -1110,22 +1120,29 @@ export function mapStylesToTailwind(
     }
   }
 
-  // Background size — auto はデフォルト
-  if (styles.backgroundSize && styles.backgroundSize !== 'auto') {
-    const cls = BG_SIZE_MAP[styles.backgroundSize];
-    if (cls) classes.push(cls);
-  }
+  // Background size/position/repeat は background-image がある要素でのみ意味を持つ。
+  // これらは getComputedStyle が常にデフォルト値 ('auto', '0% 0%', 'repeat') を
+  // 返すため、背景画像が無い要素には出力しないことでノイズを防ぐ。
+  const hasBackgroundImage =
+    !!styles.backgroundImage && styles.backgroundImage !== 'none';
+  if (hasBackgroundImage) {
+    // Background size — auto はデフォルト
+    if (styles.backgroundSize && styles.backgroundSize !== 'auto') {
+      const cls = BG_SIZE_MAP[styles.backgroundSize];
+      if (cls) classes.push(cls);
+    }
 
-  // Background position — キーワード組み合わせを Tailwind utility にマップ
-  if (styles.backgroundPosition) {
-    const cls = BG_POSITION_MAP[styles.backgroundPosition];
-    if (cls) classes.push(cls);
-  }
+    // Background position — 0% 0% (CSS デフォルト) はスキップ
+    if (styles.backgroundPosition && styles.backgroundPosition !== '0% 0%') {
+      const cls = BG_POSITION_MAP[styles.backgroundPosition];
+      if (cls) classes.push(cls);
+    }
 
-  // Background repeat — repeat はデフォルト
-  if (styles.backgroundRepeat && styles.backgroundRepeat !== 'repeat') {
-    const cls = BG_REPEAT_MAP[styles.backgroundRepeat];
-    if (cls) classes.push(cls);
+    // Background repeat — repeat はデフォルト
+    if (styles.backgroundRepeat && styles.backgroundRepeat !== 'repeat') {
+      const cls = BG_REPEAT_MAP[styles.backgroundRepeat];
+      if (cls) classes.push(cls);
+    }
   }
 
   // Text overflow — clip はデフォルト
@@ -1133,19 +1150,32 @@ export function mapStylesToTailwind(
     classes.push('text-ellipsis');
   }
 
-  // Word break — normal はデフォルト
-  if (styles.wordBreak && styles.wordBreak !== 'normal') {
+  // Word break — normal はデフォルト。継承プロパティ
+  if (
+    styles.wordBreak &&
+    styles.wordBreak !== 'normal' &&
+    !isInherited('wordBreak', styles, parentStyles)
+  ) {
     const cls = WORD_BREAK_MAP[styles.wordBreak];
     if (cls) classes.push(cls);
   }
 
-  // Overflow wrap — normal はデフォルト
-  if (styles.overflowWrap && styles.overflowWrap === 'break-word') {
+  // Overflow wrap — normal はデフォルト。継承プロパティ
+  if (
+    styles.overflowWrap &&
+    styles.overflowWrap === 'break-word' &&
+    !isInherited('overflowWrap', styles, parentStyles)
+  ) {
     classes.push('break-words');
   }
 
-  // Hyphens — none/manual はブラウザデフォルトが曖昧なので auto/manual のみ出力
-  if (styles.hyphens && styles.hyphens !== 'none' && styles.hyphens !== '') {
+  // Hyphens — CSS初期値は manual なのでスキップ。継承プロパティ
+  if (
+    styles.hyphens &&
+    styles.hyphens !== 'manual' &&
+    styles.hyphens !== '' &&
+    !isInherited('hyphens', styles, parentStyles)
+  ) {
     const cls = HYPHENS_MAP[styles.hyphens];
     if (cls) classes.push(cls);
   }
@@ -1156,11 +1186,12 @@ export function mapStylesToTailwind(
     if (cls) classes.push(cls);
   }
 
-  // Font smoothing — auto はデフォルト
+  // Font smoothing — auto はデフォルト。継承プロパティ
   if (
     styles.webkitFontSmoothing &&
     styles.webkitFontSmoothing !== 'auto' &&
-    styles.webkitFontSmoothing !== ''
+    styles.webkitFontSmoothing !== '' &&
+    !isInherited('webkitFontSmoothing', styles, parentStyles)
   ) {
     if (styles.webkitFontSmoothing === 'antialiased') {
       classes.push('antialiased');

@@ -1839,67 +1839,119 @@ describe('mapStylesToTailwind', () => {
 
   // ─── background-size / position / repeat tests ───
 
-  it('maps background-size: cover', () => {
+  it('maps background-size: cover when bg-image present', () => {
     const { classes } = mapStylesToTailwind(
-      makeStyles({ backgroundSize: 'cover' }),
+      makeStyles({
+        backgroundImage: 'url("foo.png")',
+        backgroundSize: 'cover',
+      }),
     );
     expect(classes).toContain('bg-cover');
   });
 
-  it('maps background-size: contain', () => {
+  it('maps background-size: contain when bg-image present', () => {
     const { classes } = mapStylesToTailwind(
-      makeStyles({ backgroundSize: 'contain' }),
+      makeStyles({
+        backgroundImage: 'url("foo.png")',
+        backgroundSize: 'contain',
+      }),
     );
     expect(classes).toContain('bg-contain');
   });
 
+  it('skips background-size when no background-image (regression)', () => {
+    // Regression: bg-position/size/repeat default values were leaking onto
+    // every element because getComputedStyle always returns them.
+    const { classes } = mapStylesToTailwind(
+      makeStyles({ backgroundSize: 'cover' }),
+    );
+    expect(classes.filter((c) => c === 'bg-cover')).toEqual([]);
+  });
+
   it('skips background-size: auto (default)', () => {
     const { classes } = mapStylesToTailwind(
-      makeStyles({ backgroundSize: 'auto' }),
+      makeStyles({
+        backgroundImage: 'url("foo.png")',
+        backgroundSize: 'auto',
+      }),
     );
     expect(classes.filter((c) => c === 'bg-auto' || c === 'bg-cover')).toEqual(
       [],
     );
   });
 
-  it('maps background-position keywords', () => {
+  it('maps background-position keywords when bg-image present', () => {
     expect(
-      mapStylesToTailwind(makeStyles({ backgroundPosition: '50% 0%' })).classes,
+      mapStylesToTailwind(
+        makeStyles({
+          backgroundImage: 'url("foo.png")',
+          backgroundPosition: '50% 0%',
+        }),
+      ).classes,
     ).toContain('bg-top');
     expect(
-      mapStylesToTailwind(makeStyles({ backgroundPosition: '0% 0%' })).classes,
-    ).toContain('bg-left-top');
-    expect(
-      mapStylesToTailwind(makeStyles({ backgroundPosition: '100% 100%' }))
-        .classes,
+      mapStylesToTailwind(
+        makeStyles({
+          backgroundImage: 'url("foo.png")',
+          backgroundPosition: '100% 100%',
+        }),
+      ).classes,
     ).toContain('bg-right-bottom');
   });
 
-  it('skips background-position: 0% 0% on non-image elements (default)', () => {
-    // 0% 0% is CSS default — skip when there's no background image to position
+  it('skips background-position when no background-image (regression)', () => {
+    // Regression: every element had bg-left-top because 0% 0% is the CSS
+    // default value returned by getComputedStyle.
     const { classes } = mapStylesToTailwind(
       makeStyles({ backgroundPosition: '0% 0%' }),
     );
-    // Still emit bg-left-top since that maps explicitly
-    expect(classes).toContain('bg-left-top');
+    expect(classes.filter((c) => c.startsWith('bg-'))).toEqual([]);
   });
 
-  it('maps background-repeat values', () => {
+  it('skips bg-left-top (default position) even when bg-image present', () => {
+    // 0% 0% is the CSS default position — omit to reduce noise
+    const { classes } = mapStylesToTailwind(
+      makeStyles({
+        backgroundImage: 'url("foo.png")',
+        backgroundPosition: '0% 0%',
+      }),
+    );
+    expect(classes.filter((c) => c === 'bg-left-top')).toEqual([]);
+  });
+
+  it('maps background-repeat values when bg-image present', () => {
     expect(
-      mapStylesToTailwind(makeStyles({ backgroundRepeat: 'no-repeat' }))
-        .classes,
+      mapStylesToTailwind(
+        makeStyles({
+          backgroundImage: 'url("foo.png")',
+          backgroundRepeat: 'no-repeat',
+        }),
+      ).classes,
     ).toContain('bg-no-repeat');
     expect(
-      mapStylesToTailwind(makeStyles({ backgroundRepeat: 'repeat-x' })).classes,
+      mapStylesToTailwind(
+        makeStyles({
+          backgroundImage: 'url("foo.png")',
+          backgroundRepeat: 'repeat-x',
+        }),
+      ).classes,
     ).toContain('bg-repeat-x');
-    expect(
-      mapStylesToTailwind(makeStyles({ backgroundRepeat: 'space' })).classes,
-    ).toContain('bg-repeat-space');
+  });
+
+  it('skips background-repeat when no background-image (regression)', () => {
+    const { classes } = mapStylesToTailwind(
+      makeStyles({ backgroundRepeat: 'no-repeat' }),
+    );
+    expect(classes.filter((c) => c.startsWith('bg-repeat'))).toEqual([]);
+    expect(classes).not.toContain('bg-no-repeat');
   });
 
   it('skips background-repeat: repeat (default)', () => {
     const { classes } = mapStylesToTailwind(
-      makeStyles({ backgroundRepeat: 'repeat' }),
+      makeStyles({
+        backgroundImage: 'url("foo.png")',
+        backgroundRepeat: 'repeat',
+      }),
     );
     expect(classes.filter((c) => c.startsWith('bg-repeat'))).toEqual([]);
   });
@@ -1977,17 +2029,36 @@ describe('mapStylesToTailwind', () => {
     expect(classes).toContain('break-words');
   });
 
-  it('maps hyphens values', () => {
+  it('maps hyphens: auto', () => {
     expect(
       mapStylesToTailwind(makeStyles({ hyphens: 'auto' })).classes,
     ).toContain('hyphens-auto');
-    expect(
-      mapStylesToTailwind(makeStyles({ hyphens: 'manual' })).classes,
-    ).toContain('hyphens-manual');
   });
 
-  it('skips hyphens: none (default)', () => {
-    const { classes } = mapStylesToTailwind(makeStyles({ hyphens: 'none' }));
+  it('maps hyphens: none (non-default)', () => {
+    expect(
+      mapStylesToTailwind(makeStyles({ hyphens: 'none' })).classes,
+    ).toContain('hyphens-none');
+  });
+
+  it('skips hyphens: manual (CSS default, regression)', () => {
+    // Regression: hyphens default is 'manual' per CSS spec; every element
+    // was previously getting hyphens-manual class
+    const { classes } = mapStylesToTailwind(makeStyles({ hyphens: 'manual' }));
+    expect(classes.filter((c) => c.startsWith('hyphens-'))).toEqual([]);
+  });
+
+  it('skips hyphens when inherited from parent', () => {
+    const parentStyles: NormalizedStyles = {
+      display: 'block',
+      position: 'static',
+      hyphens: 'auto',
+    };
+    const { classes } = mapStylesToTailwind(
+      makeStyles({ hyphens: 'auto' }),
+      'span',
+      parentStyles,
+    );
     expect(classes.filter((c) => c.startsWith('hyphens-'))).toEqual([]);
   });
 
