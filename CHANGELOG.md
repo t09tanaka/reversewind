@@ -1,5 +1,34 @@
 # Changelog
 
+## [0.3.2] - 2026-04-10
+
+### Added
+- `flex-grow` / `flex-shrink` / `box-sizing` / `align-self` / `align-content` / `font-family` のマッピング（既抽出だが未出力だったプロパティ）
+- `object-fit` / `object-position` / `visibility` / `isolation` のマッピング（従来の inline style fallback から Tailwind class 化）
+- `filter` / `backdrop-filter` の関数分解（`blur-*`, `brightness-*`, `grayscale`, `hue-rotate-*`, `backdrop-blur-*` 等）
+- `transform` matrix の decomposition（pure translate / scale / rotate を `translate-*` / `scale-*` / `rotate-*` に変換、複合変換は inline style フォールバック）
+- `background-size` / `background-position` / `background-repeat` のマッピング（背景画像がある要素のみ）
+- `border-style` の dashed / dotted / double 対応
+- `text-overflow` (`text-ellipsis`) / `word-break` / `overflow-wrap` / `hyphens` / `vertical-align` / `-webkit-font-smoothing` のマッピング
+- `optimizeOutputTree` 最適化パス: 視覚効果のない `relative` / `z-0` の除去、装飾なしラッパー要素の畳み込み、視覚効果ゼロの空要素の削除、単一子要素の冗長 flex 圧縮
+- positioning context 認識による `relative` 剥がし判定（子孫走査中に別の positioned element に当たったら停止、CSS 仕様通り「absolute は最近接の positioned 祖先に anchor」を反映）
+- non-zero z-index が付いた要素では `relative` を保持するロジック
+- description を「agent-ready HTML + Tailwind CSS, with zero ambiguity」に変更して Reversewind の価値提案を明確化
+
+### Fixed
+- `border: 1px solid #000` が `border-black` として出力されず色が欠落する問題（`#000000` 除外ロジックを削除）
+- `border-style: none` / `hidden` の辺が幅を持って出力される問題
+- `border-transparent` が arbitrary value (`border-[transparent]`) で出力される問題
+- `cursor: pointer` が inline style フォールバックで出力され、子要素にも継承値として重複出力される問題
+- `position: static` の要素に z-index class が出力される問題（CSS 仕様上は無効）
+- `background-position: 0% 0%` (CSS デフォルト) が全要素に `bg-left-top` として leak する問題
+- `hyphens: manual` (CSS デフォルト) が全要素に leak する問題
+- SVG の `id` / inline `style` が削られて `clipPath` / `mask` / `filter` / `linearGradient` の参照が壊れる問題
+- SVG の `width` / `height` 属性が authored size として検出されない問題（HTMLElement 限定のガードを SVGElement にも拡張）
+
+### Changed
+- SVG 要素は mapper で一切変換せず、lucide-react 等の元クラス＆属性をそのまま保持する方針を維持（`currentColor` の意味を保つため）
+
 ## [0.3.1] - 2026-04-09
 
 ### Added

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Reversewind",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "Copy any web element as agent-ready HTML + Tailwind CSS, with zero ambiguity",
   "permissions": ["contextMenus", "clipboardWrite", "scripting"],
   "host_permissions": ["<all_urls>"],
